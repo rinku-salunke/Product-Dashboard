@@ -1,27 +1,46 @@
-// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
-import Product from "./Product";
-import GetAllProducts from "./Components/GetAllProducts";
-import ProductDetail from "./Components/ProductDetail";
-import CategoryList from "./Components/CategoryList";
-import Login from "./Components/Login";
-import { SortingProvider } from "./Components/SortingContext"; // adjust if needed
+import Layout from "./Pages/Layout";
+import Products from "./Components/Products";
+import ProductDetail from "./Pages/ProductDetail";
+import Login from "./Pages/Login";
+import Users from "./Components/Users";
+import Carts from "./Components/Carts";
+
+// Protected Route wrapper
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <SortingProvider>   {/* 👈 Provider lives here */}
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route element={<Product />}>
-            <Route path="/get-all" element={<GetAllProducts />} />
-            <Route path="/categories" element={<CategoryList />} />
-            <Route path="/single-product/:id" element={<ProductDetail />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </SortingProvider>
+      <Routes>
+        {/* Public route - Login */}
+        <Route path="/" element={<Login />} />
+
+        {/* Protected routes */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/get-all" replace />} />
+          <Route path="/get-all" element={<Products />} />
+          <Route path="/single-product/:id" element={<ProductDetail />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/carts" element={<Carts />} />
+        </Route>
+
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
