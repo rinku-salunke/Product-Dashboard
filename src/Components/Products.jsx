@@ -16,7 +16,7 @@ function Products() {
 
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const itemsPerPage = 6;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -332,9 +332,8 @@ function Products() {
         {/* Left: Title & Add button */}
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-white tracking-tight">
-          Products Management
+            Products Management
           </h2>
-          
         </div>
 
         {/* Right: Filters & Search */}
