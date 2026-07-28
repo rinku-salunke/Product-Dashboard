@@ -1,4 +1,3 @@
-// src/Pages/Login.jsx (Fallback – works without Tailwind)
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -22,14 +21,13 @@ function Login() {
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         throw new Error(data.message || "Login failed");
       }
 
       localStorage.setItem("token", data.accessToken);
       localStorage.setItem("user", JSON.stringify(data));
-      navigate("/get-all");
+      navigate("/products"); // fixed: was "/get-all"
     } catch (err) {
       setError(err.message);
     } finally {
@@ -38,115 +36,43 @@ function Login() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#0b0b12",
-        padding: "16px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "400px",
-          width: "100%",
-          backgroundColor: "#12121c",
-          border: "1px solid rgba(255,255,255,0.05)",
-          borderRadius: "16px",
-          padding: "32px",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <h1
-            style={{
-              color: "white",
-              fontSize: "24px",
-              fontWeight: "bold",
-              marginBottom: "4px",
-            }}
-          >
-            Admin Login
-          </h1>
-          <p style={{ color: "#94a3b8", fontSize: "14px" }}>
-            Sign in to manage your dashboard
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-[#0b0b12] p-4">
+      <div className="w-full max-w-md bg-[#12121c] border border-white/5 rounded-2xl p-8 shadow-2xl">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-white mb-1">Admin Login</h1>
+          <p className="text-sm text-slate-400">Sign in to manage your dashboard</p>
         </div>
 
         {error && (
-          <div
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.2)",
-              color: "#f87171",
-              padding: "12px",
-              borderRadius: "12px",
-              fontSize: "14px",
-              marginBottom: "16px",
-            }}
-          >
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-sm mb-4">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#cbd5e1",
-                marginBottom: "4px",
-              }}
-            >
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-300 mb-1">
               Username
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              style={{
-                width: "100%",
-                backgroundColor: "#0b0b12",
-                border: "1px solid rgba(255,255,255,0.05)",
-                color: "white",
-                borderRadius: "12px",
-                padding: "10px 16px",
-                outline: "none",
-              }}
+              className="w-full bg-[#0b0b12] border border-white/5 text-white rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 transition"
               placeholder="Enter username"
               required
             />
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#cbd5e1",
-                marginBottom: "4px",
-              }}
-            >
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-300 mb-1">
               Password
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: "100%",
-                backgroundColor: "#0b0b12",
-                border: "1px solid rgba(255,255,255,0.05)",
-                color: "white",
-                borderRadius: "12px",
-                padding: "10px 16px",
-                outline: "none",
-              }}
+              className="w-full bg-[#0b0b12] border border-white/5 text-white rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 transition"
               placeholder="Enter password"
               required
             />
@@ -155,34 +81,14 @@ function Login() {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              width: "100%",
-              backgroundColor: "#2563eb",
-              color: "white",
-              fontWeight: "600",
-              padding: "10px",
-              borderRadius: "12px",
-              border: "none",
-              cursor: "pointer",
-              transition: "background 0.2s",
-              opacity: loading ? 0.5 : 1,
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#1d4ed8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#2563eb")}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
 
-          <p
-            style={{
-              fontSize: "12px",
-              color: "#64748b",
-              textAlign: "center",
-              marginTop: "16px",
-            }}
-          >
-            Try: username: <span style={{ color: "#60a5fa" }}>emilys</span> |
-            password: <span style={{ color: "#60a5fa" }}>emilyspass</span>
+          <p className="text-xs text-slate-500 text-center mt-4">
+            Try: username: <span className="text-blue-400">emilys</span> |
+            password: <span className="text-blue-400">emilyspass</span>
           </p>
         </form>
       </div>

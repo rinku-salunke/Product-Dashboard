@@ -1,4 +1,3 @@
-// src/Components/Users.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
 
 function Users() {
@@ -7,16 +6,16 @@ function Users() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Single combined Sorting state (format: "sortBy_order", e.g., "firstName_asc", or "" for no sorting)
+  // Sorting
   const [sortOption, setSortOption] = useState("");
 
-  // Search state
+  // Search
   const [searchTerm, setSearchTerm] = useState("");
   const [searchedUsers, setSearchedUsers] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
-  // Filter state
+  // Filter
   const [filterKey, setFilterKey] = useState("");
   const [filterValue, setFilterValue] = useState("");
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -33,10 +32,16 @@ function Users() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
 
-  // Ref for auto-focus
+  // 🛒 User carts
+  const [userCarts, setUserCarts] = useState(null);
+  const [cartsLoading, setCartsLoading] = useState(false);
+  const [cartsError, setCartsError] = useState(null);
+  const [showCarts, setShowCarts] = useState(false);
+
+  // Ref
   const valueInputRef = useRef(null);
 
-  // Available filter keys (based on DummyJSON user schema)
+  // Filter keys
   const filterKeys = [
     {
       label: "Hair Color",
@@ -54,20 +59,17 @@ function Users() {
     { label: "Role", value: "role", examples: "admin, moderator, user" },
   ];
 
-  // Extract sortBy and order from combined sortOption string (if selected)
   const [sortBy, order] = sortOption ? sortOption.split("_") : [null, null];
 
-  // ---------- Fetch all users with Optional Sorting ----------
+  // ---------- Fetch all users ----------
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        // Build URL dynamically depending on whether sorting is selected
         let url = "https://dummyjson.com/users";
         if (sortBy && order) {
           url += `?sortBy=${sortBy}&order=${order}`;
         }
-
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
@@ -81,7 +83,7 @@ function Users() {
     fetchUsers();
   }, [sortBy, order]);
 
-  // ---------- Search API ----------
+  // ---------- Search ----------
   const searchUsers = useCallback(
     async (query) => {
       const trimmed = query.trim();
@@ -91,16 +93,13 @@ function Users() {
         setSearchError(null);
         return;
       }
-
       try {
         setIsSearching(true);
         setSearchError(null);
-
         let url = `https://dummyjson.com/users/search?q=${encodeURIComponent(trimmed)}`;
         if (sortBy && order) {
           url += `&sortBy=${sortBy}&order=${order}`;
         }
-
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
@@ -115,16 +114,14 @@ function Users() {
     [sortBy, order],
   );
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       searchUsers(searchTerm);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchTerm, searchUsers]);
 
-  // ---------- Filter API ----------
+  // ---------- Filter ----------
   const filterUsers = useCallback(
     async (key, value) => {
       if (!key || !value) {
@@ -133,7 +130,6 @@ function Users() {
         setFilterError(null);
         return;
       }
-
       try {
         setIsFiltering(true);
         setFilterError(null);
@@ -141,10 +137,7 @@ function Users() {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
-
         let results = data.users || [];
-
-        // Only sort client-side if a sort option is selected
         if (sortBy && order) {
           results.sort((a, b) => {
             let valA = a[sortBy] ?? "";
@@ -156,7 +149,6 @@ function Users() {
             return 0;
           });
         }
-
         setFilteredUsers(results);
       } catch (err) {
         setFilterError(err.message || "Filter failed");
@@ -174,11 +166,7 @@ function Users() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterKey, filterValue]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  }, [filterKey, filterValue, searchTerm]);
 
   useEffect(() => {
     if (filterKey && valueInputRef.current) {
@@ -206,6 +194,7 @@ function Users() {
     if (selectedUserId === null) {
       setSelectedUser(null);
       setDetailError(null);
+      setShowCarts(false); // Reset carts view when returning to list
       return;
     }
 
@@ -228,6 +217,32 @@ function Users() {
 
     fetchUserDetail();
   }, [selectedUserId]);
+
+  // ---------- Fetch user carts when showCarts is true ----------
+  useEffect(() => {
+    if (showCarts && selectedUserId) {
+      const fetchCarts = async () => {
+        try {
+          setCartsLoading(true);
+          setCartsError(null);
+          const res = await fetch(
+            `https://dummyjson.com/carts/user/${selectedUserId}`
+          );
+          if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+          const data = await res.json();
+          setUserCarts(data.carts || []);
+        } catch (err) {
+          setCartsError(err.message || "Failed to load carts");
+        } finally {
+          setCartsLoading(false);
+        }
+      };
+      fetchCarts();
+    } else {
+      setUserCarts(null);
+      setCartsError(null);
+    }
+  }, [showCarts, selectedUserId]);
 
   // ---------- Pagination ----------
   const totalUsers = displayUsers.length;
@@ -286,6 +301,10 @@ function Users() {
 
   const handleSortOptionChange = (e) => {
     setSortOption(e.target.value);
+  };
+
+  const toggleCarts = () => {
+    setShowCarts((prev) => !prev);
   };
 
   const currentFilterLabel =
@@ -369,6 +388,7 @@ function Users() {
         </button>
 
         <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 shadow-xl">
+          {/* User Info */}
           <div className="flex items-center gap-4 mb-6">
             <img
               src={
@@ -430,6 +450,70 @@ function Users() {
               </p>
             </div>
           </div>
+
+          {/* 🛒 View Carts Button */}
+          <div className="mt-6 pt-4 border-t border-gray-800">
+            <button
+              onClick={toggleCarts}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white rounded-xl text-sm font-semibold transition border border-blue-500/30"
+            >
+              <span>{showCarts ? "Hide" : "View"} Carts</span>
+            </button>
+          </div>
+
+          {/* Carts Section */}
+          {showCarts && (
+            <div className="mt-4 pt-4 border-t border-gray-800">
+              {cartsLoading ? (
+                <div className="flex items-center gap-3 text-gray-400">
+                  <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Loading carts...</span>
+                </div>
+              ) : cartsError ? (
+                <div className="text-red-400 text-sm">{cartsError}</div>
+              ) : userCarts && userCarts.length > 0 ? (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-gray-300">
+                    Shopping Carts ({userCarts.length})
+                  </h4>
+                  {userCarts.map((cart) => (
+                    <div
+                      key={cart.id}
+                      className="bg-gray-800/50 border border-gray-700 rounded-xl p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="text-gray-300">
+                          Cart #{cart.id}
+                          <span className="text-gray-500 ml-2">
+                            ({cart.totalProducts} products, {cart.totalQuantity}{" "}
+                            items)
+                          </span>
+                        </span>
+                        <span className="text-blue-400 font-semibold">
+                          ${cart.total}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {cart.products.map((product) => (
+                          <div
+                            key={product.id}
+                            className="flex items-center justify-between text-xs text-gray-400 border-b border-gray-700/50 pb-1 last:border-0"
+                          >
+                            <span>
+                              {product.title} × {product.quantity}
+                            </span>
+                            <span>${product.price}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-400 text-sm">No carts found for this user.</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -441,7 +525,7 @@ function Users() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-white">Manage User Accounts</h2>
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          {/* Combined Sort Dropdown Menu with "No Sorting" option */}
+          {/* Sort */}
           <select
             value={sortOption}
             onChange={handleSortOptionChange}
@@ -458,7 +542,7 @@ function Users() {
             <option value="email_desc">Email (Z-A)</option>
           </select>
 
-          {/* Search Input */}
+          {/* Search */}
           <div className="relative flex-1 sm:w-48">
             <input
               type="text"
@@ -477,7 +561,7 @@ function Users() {
             )}
           </div>
 
-          {/* Filter Dropdown - Key */}
+          {/* Filter */}
           <select
             value={filterKey}
             onChange={handleFilterKeyChange}
@@ -491,7 +575,6 @@ function Users() {
             ))}
           </select>
 
-          {/* Filter Input - Value */}
           {filterKey && (
             <div className="relative">
               <input
@@ -515,7 +598,7 @@ function Users() {
         </div>
       </div>
 
-      {/* Display active filter/search info */}
+      {/* Active filters/search */}
       {filterKey && filterValue && (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-400">Filtering by:</span>
@@ -550,7 +633,6 @@ function Users() {
         </div>
       )}
 
-      {/* Display errors */}
       {filterError && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-sm">
           {filterError}
@@ -563,7 +645,6 @@ function Users() {
         </div>
       )}
 
-      {/* Loading spinner */}
       {isDisplayLoading && (
         <div className="flex justify-center items-center py-8">
           <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -573,7 +654,6 @@ function Users() {
         </div>
       )}
 
-      {/* No results */}
       {!isDisplayLoading && currentUsers.length === 0 && (
         <div className="text-center py-8 text-gray-400">
           <p className="text-sm">
@@ -586,7 +666,6 @@ function Users() {
         </div>
       )}
 
-      {/* User grid */}
       {!isDisplayLoading && currentUsers.length > 0 && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -632,7 +711,6 @@ function Users() {
             ))}
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-1.5 pt-4 border-t border-gray-800/80">
               <button

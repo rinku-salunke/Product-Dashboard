@@ -12,10 +12,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public route - Login */}
         <Route path="/login" element={<Login />} />
 
-        {/* Protected routes - wrapped in Layout */}
         <Route
           path="/"
           element={
