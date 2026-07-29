@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 function Users() {
-  // ---------- State ----------
+  // ---------- State (unchanged) ----------
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,7 +41,7 @@ function Users() {
   // Ref
   const valueInputRef = useRef(null);
 
-  // Filter keys
+  // Filter keys (unchanged)
   const filterKeys = [
     {
       label: "Hair Color",
@@ -61,7 +61,7 @@ function Users() {
 
   const [sortBy, order] = sortOption ? sortOption.split("_") : [null, null];
 
-  // ---------- Fetch all users ----------
+  // ---------- Fetch all users (unchanged) ----------
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -83,7 +83,7 @@ function Users() {
     fetchUsers();
   }, [sortBy, order]);
 
-  // ---------- Search ----------
+  // ---------- Search (unchanged) ----------
   const searchUsers = useCallback(
     async (query) => {
       const trimmed = query.trim();
@@ -121,7 +121,7 @@ function Users() {
     return () => clearTimeout(timer);
   }, [searchTerm, searchUsers]);
 
-  // ---------- Filter ----------
+  // ---------- Filter (unchanged) ----------
   const filterUsers = useCallback(
     async (key, value) => {
       if (!key || !value) {
@@ -174,7 +174,7 @@ function Users() {
     }
   }, [filterKey]);
 
-  // ---------- Determine which users to display ----------
+  // ---------- Determine which users to display (unchanged) ----------
   let displayUsers = users;
   let isDisplayLoading = loading;
   let displayError = error;
@@ -189,12 +189,12 @@ function Users() {
     displayError = searchError;
   }
 
-  // ---------- Fetch single user ----------
+  // ---------- Fetch single user (unchanged) ----------
   useEffect(() => {
     if (selectedUserId === null) {
       setSelectedUser(null);
       setDetailError(null);
-      setShowCarts(false); // Reset carts view when returning to list
+      setShowCarts(false);
       return;
     }
 
@@ -218,7 +218,7 @@ function Users() {
     fetchUserDetail();
   }, [selectedUserId]);
 
-  // ---------- Fetch user carts when showCarts is true ----------
+  // ---------- Fetch user carts (unchanged) ----------
   useEffect(() => {
     if (showCarts && selectedUserId) {
       const fetchCarts = async () => {
@@ -244,7 +244,7 @@ function Users() {
     }
   }, [showCarts, selectedUserId]);
 
-  // ---------- Pagination ----------
+  // ---------- Pagination (unchanged) ----------
   const totalUsers = displayUsers.length;
   const totalPages = Math.min(Math.ceil(totalUsers / itemsPerPage), 10);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -257,7 +257,7 @@ function Users() {
     }
   };
 
-  // ---------- Handlers ----------
+  // ---------- Handlers (unchanged) ----------
   const handleUserClick = (userId) => {
     setSelectedUserId(userId);
   };
@@ -307,12 +307,27 @@ function Users() {
     setShowCarts((prev) => !prev);
   };
 
+  // ---------- 🆕 NEW action handlers (Add/Edit/Delete) ----------
+  const handleAddUser = () => {
+    alert("Add User clicked – implement your modal or navigation here.");
+  };
+
+  const handleEditUser = (userId) => {
+    alert(`Edit user with ID: ${userId}`);
+  };
+
+  const handleDeleteUser = (userId) => {
+    if (window.confirm(`Are you sure you want to delete user ${userId}?`)) {
+      alert(`Delete user ID: ${userId}`);
+    }
+  };
+
   const currentFilterLabel =
     filterKeys.find((k) => k.value === filterKey)?.label || filterKey;
   const currentFilterExamples =
     filterKeys.find((k) => k.value === filterKey)?.examples || "";
 
-  // ---------- Loading & Error for list ----------
+  // ---------- Loading & Error for list (unchanged) ----------
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
@@ -337,7 +352,7 @@ function Users() {
     );
   }
 
-  // ---------- Detail View ----------
+  // ---------- Detail View (unchanged) ----------
   if (selectedUserId !== null) {
     if (detailLoading) {
       return (
@@ -519,11 +534,20 @@ function Users() {
     );
   }
 
-  // ---------- List View ----------
+  // ---------- List View (modified: added "Add User" and card action buttons) ----------
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-white">Manage User Accounts</h2>
+        {/* 👇 Added "Add User" button inside a flex container */}
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-white">Manage User Accounts</h2>
+          <button
+            onClick={handleAddUser}
+            className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-sm rounded-xl transition border border-emerald-500/30 flex items-center gap-1"
+          >
+            <span>+</span> Add User
+          </button>
+        </div>
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           {/* Sort */}
           <select
@@ -598,7 +622,7 @@ function Users() {
         </div>
       </div>
 
-      {/* Active filters/search */}
+      {/* Active filters/search (unchanged) */}
       {filterKey && filterValue && (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-400">Filtering by:</span>
@@ -702,10 +726,31 @@ function Users() {
                     <span className="capitalize">{user.role}</span>
                   </p>
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-800 text-center">
+                {/* 👇 Modified footer: added Edit & Delete buttons */}
+                <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between">
                   <span className="text-blue-400 text-xs font-medium hover:underline">
                     View Profile →
                   </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditUser(user.id);
+                      }}
+                      className="text-xs text-yellow-400 hover:text-yellow-300 transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteUser(user.id);
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

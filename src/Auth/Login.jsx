@@ -8,12 +8,69 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Helper: Fetch current authenticated user
+  const fetchCurrentUser = async (token) => {
+    try {
+      const res = await fetch("https://dummyjson.com/auth/me", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+        credentials: "include", // Include cookies if needed
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch user profile");
+      }
+
+      const userData = await res.json();
+      localStorage.setItem("userProfile", JSON.stringify(userData));
+      console.log("Current user:", userData);
+      return userData;
+    } catch (error) {
+      console.error("Error fetching user:", error.message);
+      return null;
+    }
+  };
+
+  // Helper: Refresh the auth session
+  const refreshAuthSession = async (refreshToken) => {
+    try {
+      const res = await fetch("https://dummyjson.com/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          refreshToken: refreshToken, // Optional — server can use cookie if omitted
+          expiresInMins: 30, // Optional, defaults to 60
+        }),
+        credentials: "include", // Include cookies
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to refresh session");
+      }
+
+      const data = await res.json();
+      // Update stored tokens with new ones
+      localStorage.setItem("token", data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
+      console.log("Session refreshed successfully");
+      return data;
+    } catch (error) {
+      console.error("Error refreshing session:", error.message);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
+      // 1. LOGIN — get access token
       const res = await fetch("https://dummyjson.com/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -25,9 +82,18 @@ function Login() {
         throw new Error(data.message || "Login failed");
       }
 
+      // 2. Store tokens
       localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("refreshToken", data.refreshToken);
       localStorage.setItem("user", JSON.stringify(data));
-      navigate("/products"); // fixed: was "/get-all"
+
+      // 3. Fetch full user profile using /auth/me
+      await fetchCurrentUser(data.accessToken);
+
+      // 4. (Optional) You can also refresh the session here if needed
+      // await refreshAuthSession(data.refreshToken);
+
+      navigate("/products");
     } catch (err) {
       setError(err.message);
     } finally {
