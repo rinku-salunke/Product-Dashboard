@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 function Users() {
   // ---------- State ----------
   const [users, setUsers] = useState([]);
-  const [totalUsers, setTotalUsers] = useState(0); // 🆕 for server pagination
+  const [totalUsers, setTotalUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -271,19 +271,19 @@ function Users() {
   let isDisplayLoading = loading;
   let displayError = error;
 
-  // 🆕 For total pages: server total for main, client length for search/filter
+  // For total pages: server total for main, client length for search/filter
   let totalItems = totalUsers;
 
   if (filterKey && filterValue) {
     displayUsers = filteredUsers;
     isDisplayLoading = isFiltering;
     displayError = filterError;
-    totalItems = displayUsers.length; // client‑side total
+    totalItems = displayUsers.length;
   } else if (searchTerm.trim()) {
     displayUsers = searchedUsers;
     isDisplayLoading = isSearching;
     displayError = searchError;
-    totalItems = displayUsers.length; // client‑side total
+    totalItems = displayUsers.length;
   }
 
   // ---------- Fetch single user detail ----------
@@ -341,13 +341,28 @@ function Users() {
     }
   }, [showCarts, selectedUserId]);
 
-  // ---------- Pagination ----------
+  // ---------- Pagination (FIXED) ----------
+  const isMainList = !filterKey && !filterValue && !searchTerm.trim();
+
   const totalPages = Math.min(Math.ceil(totalItems / itemsPerPage), 10);
-  // For client‑side modes, we slice displayUsers; for main, users is already paginated from server.
-  // But we keep slicing for consistency (main users length will be <= itemsPerPage).
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentUsers = displayUsers.slice(startIndex, endIndex);
+
+  // Correct page if out of bounds
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
+  let currentUsers;
+  if (isMainList) {
+    // Server‑side pagination: users already contain only the current page
+    currentUsers = displayUsers;
+  } else {
+    // Client‑side pagination: slice displayUsers
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    currentUsers = displayUsers.slice(startIndex, endIndex);
+  }
 
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -366,7 +381,7 @@ function Users() {
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // reset page on new search
+    setCurrentPage(1);
     if (filterKey && filterValue) {
       setFilterKey("");
       setFilterValue("");
@@ -403,7 +418,7 @@ function Users() {
 
   const handleSortOptionChange = (e) => {
     setSortOption(e.target.value);
-    setCurrentPage(1); // reset page when sorting changes
+    setCurrentPage(1);
   };
 
   const toggleCarts = () => {
@@ -503,7 +518,6 @@ function Users() {
         setUsers((prev) => prev.map((u) => (u.id === result.id ? result : u)));
       } else {
         setUsers((prev) => [result, ...prev]);
-        // Increase totalUsers count for pagination (if not searching/filtering)
         setTotalUsers((prev) => prev + 1);
       }
 
@@ -531,10 +545,8 @@ function Users() {
       const result = await res.json();
       console.log("Deleted user:", result);
 
-      // Remove from main list
       setUsers((prev) => prev.filter((u) => u.id !== userId));
       setTotalUsers((prev) => Math.max(prev - 1, 0));
-      // Also clean up search & filter results
       setSearchedUsers((prev) => prev.filter((u) => u.id !== userId));
       setFilteredUsers((prev) => prev.filter((u) => u.id !== userId));
 
