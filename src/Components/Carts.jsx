@@ -10,6 +10,9 @@ const Carts = () => {
   const itemsPerPage = 4;
   const abortControllerRef = useRef(null);
 
+  // Track deleted cart IDs to filter out from API responses
+  const [deletedCartIds, setDeletedCartIds] = useState([]);
+
   // Filter by user
   const [userIdFilter, setUserIdFilter] = useState("");
   const [filterLoading, setFilterLoading] = useState(false);
@@ -38,6 +41,11 @@ const Carts = () => {
   const [selectedCart, setSelectedCart] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // ---------- Helper: filter out deleted carts ----------
+  const filterDeleted = (cartList) => {
+    return cartList.filter((cart) => !deletedCartIds.includes(cart.id));
+  };
+
   // ---------- Fetch all carts ----------
   const fetchCarts = async () => {
     abortControllerRef.current = new AbortController();
@@ -50,7 +58,9 @@ const Carts = () => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       if (data && Array.isArray(data.carts)) {
-        setCarts(data.carts);
+        // Filter out deleted carts
+        const filtered = filterDeleted(data.carts);
+        setCarts(filtered);
         setCurrentPage(1);
       } else {
         throw new Error("Invalid data format received");
@@ -70,7 +80,6 @@ const Carts = () => {
   // ---------- Fetch carts by user ----------
   const fetchCartsByUser = async (userId) => {
     if (!userId || isNaN(userId)) {
-      // If empty or invalid, fall back to all carts
       fetchCarts();
       return;
     }
@@ -82,17 +91,16 @@ const Carts = () => {
       );
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
+      let cartList = [];
       if (data && Array.isArray(data.carts)) {
-        setCarts(data.carts);
-        setCurrentPage(1);
-      } else {
-        // sometimes the API returns a single cart object, wrap it
-        if (data && data.id) {
-          setCarts([data]);
-        } else {
-          setCarts([]);
-        }
+        cartList = data.carts;
+      } else if (data && data.id) {
+        cartList = [data];
       }
+      // Filter out deleted carts
+      const filtered = filterDeleted(cartList);
+      setCarts(filtered);
+      setCurrentPage(1);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -137,7 +145,6 @@ const Carts = () => {
     setMutationError(null);
 
     try {
-      // Build products array from form
       const products = addFormData.products
         .filter((p) => p.id && p.quantity)
         .map((p) => ({
@@ -162,10 +169,8 @@ const Carts = () => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const newCart = await response.json();
 
-      // Optimistically add to list
       setCarts((prev) => [newCart, ...prev]);
       setShowAddModal(false);
-      // Reset form
       setAddFormData({ userId: "", products: [{ id: "", quantity: "" }] });
     } catch (err) {
       setMutationError(err.message);
@@ -208,7 +213,6 @@ const Carts = () => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const updatedCart = await response.json();
 
-      // Update cart in list
       setCarts((prev) =>
         prev.map((c) => (c.id === updatedCart.id ? updatedCart : c))
       );
@@ -237,7 +241,9 @@ const Carts = () => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       await response.json();
 
-      // Remove from list
+      // Add to deleted IDs so future fetches filter it out
+      setDeletedCartIds((prev) => [...prev, cartId]);
+      // Remove from current list
       setCarts((prev) => prev.filter((c) => c.id !== cartId));
       if (expandedCartId === cartId) setExpandedCartId(null);
     } catch (err) {
@@ -271,7 +277,6 @@ const Carts = () => {
     }));
   };
 
-  // Same for edit
   const handleEditFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditFormData((prev) => ({
@@ -305,10 +310,18 @@ const Carts = () => {
 
   const handleRetry = () => fetchCarts();
 
+  // ---------- Pagination (with page correction) ----------
   const totalPages = Math.min(10, Math.ceil(carts.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentCarts = carts.slice(startIndex, endIndex);
+
+  // Reset page if out of bounds
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -344,7 +357,7 @@ const Carts = () => {
   // ---------- Render ----------
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 bg-gray-50 min-h-screen">
-      {/* ---------- Header ---------- */}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -390,7 +403,7 @@ const Carts = () => {
         </div>
       )}
 
-      {/* ---------- Cart Grid ---------- */}
+      {/* Cart Grid */}
       {carts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16">
           <div className="text-6xl opacity-50">🛒</div>

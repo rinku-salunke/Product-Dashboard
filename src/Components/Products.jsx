@@ -9,11 +9,16 @@ function Products() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Pagination (server-side)
+  // 🔥 Track locally added products (not yet on server)
+  const [localAddedProducts, setLocalAddedProducts] = useState([]);
+  // 🔥 Track deleted product IDs
+  const [deletedProductIds, setDeletedProductIds] = useState([]);
+
+  // Pagination (server-side for main, client-side for search)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
-  // Sorting (server-side)
+  // Sorting (server-side for main, client-side for search)
   const [sortBy, setSortBy] = useState("title");
   const [sortOrder, setSortOrder] = useState("asc");
 
@@ -24,7 +29,7 @@ function Products() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categories, setCategories] = useState(["all"]);
 
-  // Add/Edit/Delete forms (unchanged)
+  // Add/Edit/Delete forms
   const [showAddForm, setShowAddForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -38,7 +43,7 @@ function Products() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // ---------- Fetch categories (NEW) ----------
+  // ---------- Fetch categories ----------
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -54,45 +59,107 @@ function Products() {
     fetchCategories();
   }, []);
 
-  // ---------- Main fetch function (UPGRADED: uses server-side pagination, sorting, category) ----------
+  // ---------- Helper: filter out deleted products ----------
+  const filterDeleted = (productList) => {
+    return productList.filter((p) => !deletedProductIds.includes(p.id));
+  };
+
+  // ---------- Helper: sort products (client-side) ----------
+  const sortProducts = (list) => {
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      let valA = a[sortBy] ?? "";
+      let valB = b[sortBy] ?? "";
+      if (typeof valA === "string") valA = valA.toLowerCase();
+      if (typeof valB === "string") valB = valB.toLowerCase();
+      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  };
+
+  // ---------- Main fetch function ----------
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const skip = (currentPage - 1) * itemsPerPage;
-      const limit = itemsPerPage;
-
-      // Build the URL based on search/category
-      let baseUrl = "https://dummyjson.com/products";
       const trimmedSearch = searchTerm.trim();
+      const isSearching = trimmedSearch !== "";
 
-      if (trimmedSearch) {
-        // ✅ API: /products/search?q=phone
-        baseUrl = `https://dummyjson.com/products/search?q=${encodeURIComponent(trimmedSearch)}`;
-      } else if (selectedCategory !== "all") {
-        // ✅ API: /products/category/smartphones
-        baseUrl = `https://dummyjson.com/products/category/${encodeURIComponent(selectedCategory)}`;
+      // ---- CASE 1: No search – server-side pagination + category + sorting ----
+      if (!isSearching) {
+        const skip = (currentPage - 1) * itemsPerPage;
+        const limit = itemsPerPage;
+
+        let baseUrl = "https://dummyjson.com/products";
+        if (selectedCategory !== "all") {
+          baseUrl = `https://dummyjson.com/products/category/${encodeURIComponent(selectedCategory)}`;
+        }
+
+        const params = new URLSearchParams();
+        params.append("limit", limit);
+        params.append("skip", skip);
+        params.append("select", "id,title,price,thumbnail,category,rating,stock");
+        params.append("sortBy", sortBy);
+        params.append("order", sortOrder);
+
+        const separator = baseUrl.includes("?") ? "&" : "?";
+        const fullUrl = `${baseUrl}${separator}${params.toString()}`;
+
+        const res = await fetch(fullUrl);
+        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+        const data = await res.json();
+
+        // Filter out deleted products
+        const filtered = filterDeleted(data.products || []);
+        setProducts(filtered);
+        setTotal(data.total || 0);
+        setLoading(false);
+        return;
       }
 
-      // ✅ API: ?limit=10&skip=10&select=title,price
-      // ✅ API: ?sortBy=title&order=asc
-      const params = new URLSearchParams();
-      params.append("limit", limit);
-      params.append("skip", skip);
-      params.append("select", "id,title,price,thumbnail,category,rating,stock");
-      params.append("sortBy", sortBy);
-      params.append("order", sortOrder);
+      // ---- CASE 2: Search – fetch all matching from API, merge with local, client-side pagination ----
+      // Fetch all matching products from API (use a large limit)
+      let searchUrl = `https://dummyjson.com/products/search?q=${encodeURIComponent(trimmedSearch)}&limit=100&select=id,title,price,thumbnail,category,rating,stock`;
+      // Add sorting if needed (API supports sortBy/order)
+      searchUrl += `&sortBy=${sortBy}&order=${sortOrder}`;
 
-      const separator = baseUrl.includes("?") ? "&" : "?";
-      const fullUrl = `${baseUrl}${separator}${params.toString()}`;
-
-      const res = await fetch(fullUrl);
+      const res = await fetch(searchUrl);
       if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
       const data = await res.json();
 
-      setProducts(data.products || []);
-      setTotal(data.total || 0);
+      let apiProducts = data.products || [];
+      // Filter out deleted products
+      apiProducts = filterDeleted(apiProducts);
+
+      // Filter local added products by search term
+      const localMatches = localAddedProducts.filter((p) =>
+        p.title?.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
+        p.category?.toLowerCase().includes(trimmedSearch.toLowerCase())
+      );
+
+      // Merge: API products first, then local products not already in API
+      const apiIds = new Set(apiProducts.map((p) => p.id));
+      const merged = [...apiProducts];
+      for (const localProduct of localMatches) {
+        if (!apiIds.has(localProduct.id)) {
+          merged.push(localProduct);
+        }
+      }
+
+      // Sort merged list (client-side) because API sorting may not be consistent with merged data
+      const sorted = sortProducts(merged);
+
+      // Apply client-side pagination
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const paginated = sorted.slice(start, end);
+
+      setProducts(paginated);
+      setTotal(sorted.length); // total is the full merged list length
+
     } catch (err) {
       setError(err.message || "Failed to fetch products");
       setProducts([]);
@@ -100,7 +167,7 @@ function Products() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, sortBy, sortOrder, searchTerm, selectedCategory]);
+  }, [currentPage, itemsPerPage, sortBy, sortOrder, searchTerm, selectedCategory, localAddedProducts, deletedProductIds]);
 
   // ---------- Trigger fetch when dependencies change ----------
   useEffect(() => {
@@ -112,10 +179,16 @@ function Products() {
     setCurrentPage(1);
   }, [searchTerm, selectedCategory, sortBy, sortOrder]);
 
-  // ---------- Pagination ----------
+  // ---------- Pagination (with page correction) ----------
   const totalPages = Math.ceil(total / itemsPerPage) || 1;
 
-  // ---------- Add Product (unchanged) ----------
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  // ---------- Add Product ----------
   const handleAddProductSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.price) {
@@ -125,7 +198,6 @@ function Products() {
 
     try {
       setIsSubmitting(true);
-      // ✅ API: POST /products/add
       const res = await fetch("https://dummyjson.com/products/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -143,8 +215,13 @@ function Products() {
       const newProduct = await res.json();
       console.log("Added successfully:", newProduct);
 
-      await fetchProducts();
+      // Add to local added products
+      setLocalAddedProducts((prev) => [newProduct, ...prev]);
+      // Also add to current list (if not searching, we'll show it immediately)
+      setProducts((prev) => [newProduct, ...prev]);
+      setTotal((prev) => prev + 1);
 
+      // Reset form
       setFormData({
         title: "",
         price: "",
@@ -161,13 +238,23 @@ function Products() {
     }
   };
 
-  // ---------- Delete Product (unchanged) ----------
+  // ---------- Delete Product ----------
   const handleDeleteProduct = async (id, e) => {
     e.preventDefault();
     if (!window.confirm("Are you sure you want to delete this product?")) return;
 
     try {
-      // ✅ API: DELETE /products/1
+      // Check if product is local (not on server)
+      const isLocal = localAddedProducts.some((p) => p.id === id);
+      if (isLocal) {
+        // Remove from local list
+        setLocalAddedProducts((prev) => prev.filter((p) => p.id !== id));
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setTotal((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+
+      // Server product: call DELETE
       const res = await fetch(`https://dummyjson.com/products/${id}`, {
         method: "DELETE",
       });
@@ -175,14 +262,17 @@ function Products() {
       const data = await res.json();
       console.log("Deleted successfully:", data);
 
-      await fetchProducts();
+      // Mark as deleted locally
+      setDeletedProductIds((prev) => [...prev, id]);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      setTotal((prev) => Math.max(prev - 1, 0));
     } catch (err) {
       console.error("Failed to delete product:", err);
       alert("Failed to delete the product. Please try again.");
     }
   };
 
-  // ---------- Edit (start) (unchanged) ----------
+  // ---------- Edit (start) ----------
   const handleEditClick = (product, e) => {
     e.preventDefault();
     setEditingProduct({
@@ -196,7 +286,7 @@ function Products() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ---------- Update Product (unchanged) ----------
+  // ---------- Update Product ----------
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
     if (!editingProduct.title.trim() || !editingProduct.price) {
@@ -206,7 +296,25 @@ function Products() {
 
     try {
       setIsUpdating(true);
-      // ✅ API: PUT /products/1
+
+      // Check if product is local (not on server)
+      const isLocal = localAddedProducts.some((p) => p.id === editingProduct.id);
+      if (isLocal) {
+        // Update locally
+        const updated = { ...editingProduct };
+        setLocalAddedProducts((prev) =>
+          prev.map((p) => (p.id === updated.id ? updated : p))
+        );
+        setProducts((prev) =>
+          prev.map((p) => (p.id === updated.id ? updated : p))
+        );
+        alert("Product updated locally!");
+        setEditingProduct(null);
+        setIsUpdating(false);
+        return;
+      }
+
+      // Server product: call PUT
       const res = await fetch(
         `https://dummyjson.com/products/${editingProduct.id}`,
         {
@@ -219,14 +327,16 @@ function Products() {
             description: editingProduct.description,
             thumbnail: editingProduct.thumbnail,
           }),
-        },
+        }
       );
       if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
       const updatedData = await res.json();
       console.log("Updated successfully:", updatedData);
 
-      await fetchProducts();
-
+      // Update in main list
+      setProducts((prev) =>
+        prev.map((p) => (p.id === updatedData.id ? updatedData : p))
+      );
       alert("Product updated successfully!");
       setEditingProduct(null);
     } catch (err) {
@@ -240,7 +350,7 @@ function Products() {
   // ---------- Render ----------
   return (
     <div className="flex flex-col min-h-full justify-start bg-gray-950 px-3 sm:px-6 pb-3 sm:pb-6 pt-0 rounded-2xl sm:rounded-3xl border border-gray-800 shadow-2xl overflow-x-hidden gap-0">
-      {/* Header */}
+      {/* Header (unchanged) */}
       <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm pt-4 pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-white tracking-tight">Products Management</h2>
@@ -254,7 +364,6 @@ function Products() {
             + Add New
           </button>
 
-          {/* Category filter - now uses server-side /category/{slug} */}
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -267,7 +376,6 @@ function Products() {
             ))}
           </select>
 
-          {/* Sorting - now uses server-side sortBy & order */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -284,7 +392,6 @@ function Products() {
             {sortOrder === "asc" ? "↑" : "↓"}
           </button>
 
-          {/* Search - uses /search?q= */}
           <input
             type="text"
             placeholder="Search products..."
@@ -577,7 +684,7 @@ function Products() {
                 ))}
               </div>
 
-              {/* Pagination - uses total from server */}
+              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-1.5 pt-4 border-t border-gray-800/80">
                   <button
