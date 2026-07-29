@@ -640,8 +640,9 @@ function Users() {
           Back to Users
         </button>
 
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 shadow-xl">
-          {/* User Info */}
+        {/* User Detail Card */}
+        <div className="bg-[#12121c] border border-white/5 rounded-2xl p-6 shadow-xl">
+          {/* User Header */}
           <div className="flex items-center gap-4 mb-6">
             <img
               src={
@@ -662,49 +663,137 @@ function Users() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-500">Email</p>
-              <p className="text-gray-200">{selectedUser.email}</p>
+          {/* User Details Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Personal Information */}
+            <div className="bg-[#0b0b12] rounded-xl border border-white/5 p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Personal Info</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Full Name</span>
+                  <span className="text-white font-medium text-sm">
+                    {selectedUser.firstName} {selectedUser.lastName}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Maiden Name</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.maidenName || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Age</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.age}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Gender</span>
+                  <span className="text-gray-300 text-sm capitalize">{selectedUser.gender}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Birth Date</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.birthDate || "N/A"}</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-500">Phone</p>
-              <p className="text-gray-200">{selectedUser.phone}</p>
+
+            {/* Contact Information */}
+            <div className="bg-[#0b0b12] rounded-xl border border-white/5 p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Contact Info</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Email</span>
+                  <span className="text-gray-300 text-sm truncate max-w-[140px]">{selectedUser.email}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Phone</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.phone}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Username</span>
+                  <span className="text-gray-300 text-sm">@{selectedUser.username}</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-500">Age</p>
-              <p className="text-gray-200">{selectedUser.age}</p>
+
+            {/* Physical & Other Details */}
+            <div className="bg-[#0b0b12] rounded-xl border border-white/5 p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Physical & Other</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Blood Group</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.bloodGroup || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Height</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.height ? `${selectedUser.height} cm` : "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Weight</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.weight ? `${selectedUser.weight} kg` : "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                  <span className="text-gray-500 text-sm">Eye Color</span>
+                  <span className="text-gray-300 text-sm">{selectedUser.eyeColor || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Hair</span>
+                  <span className="text-gray-300 text-sm">
+                    {selectedUser.hair?.color || "N/A"} {selectedUser.hair?.type || ""}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-500">Gender</p>
-              <p className="text-gray-200 capitalize">{selectedUser.gender}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Blood Group</p>
-              <p className="text-gray-200">{selectedUser.bloodGroup}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Birth Date</p>
-              <p className="text-gray-200">{selectedUser.birthDate}</p>
-            </div>
-            <div className="sm:col-span-2">
-              <p className="text-gray-500">Address</p>
-              <p className="text-gray-200">
-                {selectedUser.address?.address}, {selectedUser.address?.city},{" "}
-                {selectedUser.address?.state} {selectedUser.address?.postalCode}
-                , {selectedUser.address?.country}
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <p className="text-gray-500">Company</p>
-              <p className="text-gray-200">
-                {selectedUser.company?.name} – {selectedUser.company?.title} (
-                {selectedUser.company?.department})
-              </p>
-            </div>
+
+            {/* Address */}
+            {selectedUser.address && (
+              <div className="bg-[#0b0b12] rounded-xl border border-white/5 p-4 sm:col-span-2 lg:col-span-3">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Address</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span className="text-gray-500 text-sm">Street</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.address.address || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span className="text-gray-500 text-sm">City</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.address.city || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span className="text-gray-500 text-sm">State</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.address.state || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span className="text-gray-500 text-sm">Postal Code</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.address.postalCode || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center sm:col-span-2">
+                    <span className="text-gray-500 text-sm">Country</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.address.country || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Company */}
+            {selectedUser.company && (
+              <div className="bg-[#0b0b12] rounded-xl border border-white/5 p-4 sm:col-span-2 lg:col-span-3">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Company</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span className="text-gray-500 text-sm">Company</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.company.name || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <span className="text-gray-500 text-sm">Title</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.company.title || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center sm:col-span-2">
+                    <span className="text-gray-500 text-sm">Department</span>
+                    <span className="text-gray-300 text-sm">{selectedUser.company.department || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Carts Button */}
+          {/* Carts Button Only - Removed Edit and Delete buttons */}
           <div className="mt-6 pt-4 border-t border-gray-800">
             <button
               onClick={toggleCarts}
