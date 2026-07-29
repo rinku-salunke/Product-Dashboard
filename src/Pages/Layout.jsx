@@ -6,7 +6,7 @@ function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // NEW: desktop toggle
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [user, setUser] = useState(null);
 
   // Load user from localStorage
@@ -50,18 +50,31 @@ function Layout() {
             Admin Portal
           </h1>
         </div>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-slate-300 hover:text-white focus:outline-none bg-white/5 rounded-xl border border-white/5 cursor-pointer"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isMobileMenuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            )}
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 🆕 Mobile Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="p-2 text-slate-300 hover:text-white focus:outline-none bg-white/5 rounded-xl border border-white/5 cursor-pointer"
+            aria-label="Logout"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+          {/* Hamburger Menu */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 text-slate-300 hover:text-white focus:outline-none bg-white/5 rounded-xl border border-white/5 cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ===== SIDEBAR ===== */}
@@ -71,7 +84,7 @@ function Layout() {
           bg-[#0b0b12] border-r border-white/5 flex flex-col shadow-2xl h-full 
           transition-all duration-300 ease-in-out
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-          ${isSidebarCollapsed ? "md:w-20" : "md:w-64"}  /* ← Collapsible sidebar on desktop */
+          ${isSidebarCollapsed ? "md:w-20" : "md:w-64"}
         `}
       >
         {/* Brand Header – hidden when collapsed */}
@@ -158,7 +171,7 @@ function Layout() {
       {/* ===== MAIN CONTENT AREA ===== */}
       <div className="flex-1 flex flex-col min-w-0 w-full bg-[#0b0b12] overflow-x-hidden">
         
-        {/* Top Header with Avatar Dropdown */}
+        {/* Top Header with Avatar Dropdown (Desktop only) */}
         <header className="hidden md:flex h-16 bg-[#0b0b12] border-b border-white/5 items-center justify-end px-4 sm:px-6 lg:px-8 shrink-0 relative">
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -202,7 +215,7 @@ function Layout() {
           </div>
         </header>
 
-        {/* Page Content – fully responsive padding */}
+        {/* Page Content */}
         <main className="flex-1 w-full p-4 sm:p-6 md:p-6 lg:p-8 xl:p-10 bg-[#0b0b12] overflow-y-auto">
           <Outlet />
         </main>
