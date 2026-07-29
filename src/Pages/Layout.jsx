@@ -160,9 +160,9 @@ function Layout() {
       <div className={`flex-1 flex flex-col min-w-0 w-full bg-[#0b0b12] overflow-x-hidden transition-all duration-300 ${contentMargin}`}>
         
         {/* Header with Hamburger + Welcome Message + Avatar */}
-        <header className="h-16 bg-[#0b0b12] border-b border-white/5 flex items-center px-4 sm:px-6 lg:px-8 shrink-0 relative">
+        <header className="min-h-16 bg-[#0b0b12] border-b border-white/5 flex items-center px-3 sm:px-6 lg:px-8 shrink-0 relative">
           
-          {/* LEFT: Hamburger on mobile */}
+          {/* LEFT: Hamburger on mobile (visible on all screens, but hidden on desktop) */}
           <button
             onClick={() => setIsMobileOpen(true)}
             className="md:hidden text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
@@ -173,26 +173,22 @@ function Layout() {
             </svg>
           </button>
 
-          {/* CENTER: Welcome Message (visible on md+ screens) */}
-          <div className="hidden md:flex flex-1 items-center justify-center px-4">
-            <div className="flex items-center gap-3 bg-blue-600/10 border border-blue-500/20 rounded-xl px-4 py-1.5">
-              <span className="text-base">👋</span>
-              <p className="text-sm font-medium text-white whitespace-nowrap">
+          {/* CENTER: Welcome Message - Visible on ALL screens (mobile + desktop) */}
+          <div className="flex-1 flex items-center justify-center px-2 sm:px-4 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 bg-blue-600/10 border border-blue-500/20 rounded-xl px-2 sm:px-4 py-1 sm:py-1.5 max-w-full">
+              <span className="text-sm sm:text-base shrink-0">👋</span>
+              <p className="text-xs sm:text-sm font-medium text-white truncate">
                 Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
               </p>
-              <span className="flex items-center gap-1.5 text-[10px] text-green-400">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                Online
-              </span>
             </div>
           </div>
 
           {/* RIGHT: Avatar & dropdown */}
-          <div className="flex items-center gap-4 ml-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto shrink-0">
             <div className="relative">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-semibold text-sm ring-2 ring-white/10 hover:ring-blue-400 transition-all cursor-pointer focus:outline-none"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-semibold text-xs sm:text-sm ring-2 ring-white/10 hover:ring-blue-400 transition-all cursor-pointer focus:outline-none"
               >
                 {user ? user.firstName?.charAt(0).toUpperCase() || "A" : "A"}
               </button>
@@ -225,20 +221,6 @@ function Layout() {
             </div>
           </div>
         </header>
-
-        {/* Mobile Welcome Message (visible only on mobile, below header) */}
-        <div className="md:hidden px-4 py-2 bg-blue-600/5 border-b border-blue-500/10">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">👋</span>
-            <p className="text-xs font-medium text-white truncate">
-              Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
-            </p>
-            <span className="flex items-center gap-1 text-[8px] text-green-400 ml-auto shrink-0">
-              <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
-              Online
-            </span>
-          </div>
-        </div>
 
         {/* Page Content */}
         <main className="flex-1 w-full p-3 sm:p-4 md:p-6 lg:p-8 xl:p-10 bg-[#0b0b12] overflow-y-auto">
