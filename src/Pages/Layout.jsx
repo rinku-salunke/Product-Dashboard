@@ -6,8 +6,12 @@ function Layout() {
   const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false); // for hamburger on mobile
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
+
+  // Get user full name for welcome message
+  const userFullName = localStorage.getItem("userFullName") || "User";
+  const userFirstName = localStorage.getItem("userFirstName") || "";
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -18,7 +22,12 @@ function Layout() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("userProfile");
+    localStorage.removeItem("userFullName");
+    localStorage.removeItem("userFirstName");
+    localStorage.removeItem("userLastName");
     setIsDropdownOpen(false);
     navigate("/login");
   };
@@ -34,12 +43,10 @@ function Layout() {
     }
   `;
 
-  // Sidebar widths: expanded vs collapsed (desktop)
   const sidebarWidth = isSidebarCollapsed
     ? "w-14 md:w-20"
     : "w-48 md:w-64";
 
-  // Content margin (only applied on md+ screens)
   const contentMargin = isSidebarCollapsed
     ? "md:ml-14 lg:ml-20"
     : "md:ml-48 lg:ml-64";
@@ -63,9 +70,8 @@ function Layout() {
           flex flex-col shadow-2xl 
           transition-all duration-300 ease-in-out
           ${sidebarWidth}
-          /* Mobile: slide in/out */
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0   /* always visible on desktop */
+          md:translate-x-0
         `}
       >
         {/* Brand Header */}
@@ -92,7 +98,7 @@ function Layout() {
             <Link
               to="/products"
               className={navLinkClass("/products")}
-              onClick={() => setIsMobileOpen(false)} // close on mobile after navigation
+              onClick={() => setIsMobileOpen(false)}
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -124,7 +130,7 @@ function Layout() {
           </div>
         </nav>
 
-        {/* Collapse Toggle (visible on md+) */}
+        {/* Collapse Toggle */}
         <div className="hidden md:block p-2 border-t border-white/5">
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -139,7 +145,7 @@ function Layout() {
             </svg>
           </button>
         </div>
-        {/* Close button for mobile (inside sidebar) */}
+
         <button
           onClick={() => setIsMobileOpen(false)}
           className="md:hidden absolute top-4 right-4 text-slate-400 hover:text-white"
@@ -153,12 +159,13 @@ function Layout() {
       {/* ===== MAIN CONTENT ===== */}
       <div className={`flex-1 flex flex-col min-w-0 w-full bg-[#0b0b12] overflow-x-hidden transition-all duration-300 ${contentMargin}`}>
         
-        {/* Header with Hamburger (mobile) + Avatar Dropdown */}
-        <header className="h-16 bg-[#0b0b12] border-b border-white/5 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 relative">
-          {/* Left side: Hamburger on mobile */}
+        {/* Header with Hamburger + Welcome Message + Avatar */}
+        <header className="h-16 bg-[#0b0b12] border-b border-white/5 flex items-center px-4 sm:px-6 lg:px-8 shrink-0 relative">
+          
+          {/* LEFT: Hamburger on mobile */}
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="md:hidden text-slate-400 hover:text-white transition-colors cursor-pointer"
+            className="md:hidden text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
             aria-label="Open menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,33 +173,43 @@ function Layout() {
             </svg>
           </button>
 
-          {/* Right side: Avatar & dropdown */}
-          <div className="flex items-center gap-4 ml-auto">
+          {/* CENTER: Welcome Message (visible on md+ screens) */}
+          <div className="hidden md:flex flex-1 items-center justify-center px-4">
+            <div className="flex items-center gap-3 bg-blue-600/10 border border-blue-500/20 rounded-xl px-4 py-1.5">
+              <span className="text-base">👋</span>
+              <p className="text-sm font-medium text-white whitespace-nowrap">
+                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
+              </p>
+              <span className="flex items-center gap-1.5 text-[10px] text-green-400">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                Online
+              </span>
+            </div>
+          </div>
+
+          {/* RIGHT: Avatar & dropdown */}
+          <div className="flex items-center gap-4 ml-auto shrink-0">
             <div className="relative">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-semibold text-sm ring-2 ring-white/10 hover:ring-blue-400 transition-all cursor-pointer focus:outline-none"
               >
-                {user ? user.firstName?.charAt(0) || "A" : "A"}
+                {user ? user.firstName?.charAt(0).toUpperCase() || "A" : "A"}
               </button>
 
               {isDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
                   <div className="absolute right-0 mt-2 w-56 bg-[#1a1a2e] rounded-xl shadow-2xl border border-white/10 z-50 py-1 overflow-hidden">
-                    {user ? (
-                      <div className="px-4 py-3 border-b border-white/5">
-                        <p className="text-sm font-medium text-white">
-                          {user.firstName} {user.lastName}
-                        </p>
-                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                        <p className="text-xs text-blue-400 mt-1">Admin</p>
-                      </div>
-                    ) : (
-                      <div className="px-4 py-3 border-b border-white/5">
-                        <p className="text-sm font-medium text-white">Admin</p>
-                      </div>
-                    )}
+                    <div className="px-4 py-3 border-b border-white/5">
+                      <p className="text-sm font-medium text-white">
+                        {userFullName}
+                      </p>
+                      <p className="text-xs text-slate-400 truncate">
+                        {user?.email || "admin@example.com"}
+                      </p>
+                      <p className="text-xs text-blue-400 mt-1">Admin</p>
+                    </div>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150 cursor-pointer"
@@ -209,7 +226,21 @@ function Layout() {
           </div>
         </header>
 
-        {/* Page Content – responsive padding */}
+        {/* Mobile Welcome Message (visible only on mobile, below header) */}
+        <div className="md:hidden px-4 py-2 bg-blue-600/5 border-b border-blue-500/10">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">👋</span>
+            <p className="text-xs font-medium text-white truncate">
+              Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
+            </p>
+            <span className="flex items-center gap-1 text-[8px] text-green-400 ml-auto shrink-0">
+              <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+              Online
+            </span>
+          </div>
+        </div>
+
+        {/* Page Content */}
         <main className="flex-1 w-full p-3 sm:p-4 md:p-6 lg:p-8 xl:p-10 bg-[#0b0b12] overflow-y-auto">
           <Outlet />
         </main>
