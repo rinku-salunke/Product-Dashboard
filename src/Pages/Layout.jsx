@@ -6,9 +6,9 @@ function Layout() {
   const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false); // for hamburger on mobile
   const [user, setUser] = useState(null);
 
-  // Load user from localStorage
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
@@ -34,18 +34,28 @@ function Layout() {
     }
   `;
 
-  // ✅ Responsive sidebar widths
+  // Sidebar widths: expanded vs collapsed (desktop)
   const sidebarWidth = isSidebarCollapsed
     ? "w-14 md:w-20"
     : "w-48 md:w-64";
+
+  // Content margin (only applied on md+ screens)
   const contentMargin = isSidebarCollapsed
-    ? "ml-14 md:ml-20"
-    : "ml-48 md:ml-64";
+    ? "md:ml-14 lg:ml-20"
+    : "md:ml-48 lg:ml-64";
 
   return (
     <div className="flex w-full min-h-screen bg-[#0b0b12] font-sans overflow-x-hidden text-slate-100">
       
-      {/* ===== SIDEBAR – always visible, responsive width ===== */}
+      {/* ===== MOBILE OVERLAY BACKDROP ===== */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* ===== SIDEBAR ===== */}
       <aside
         className={`
           fixed left-0 top-0 z-50 h-full
@@ -53,6 +63,9 @@ function Layout() {
           flex flex-col shadow-2xl 
           transition-all duration-300 ease-in-out
           ${sidebarWidth}
+          /* Mobile: slide in/out */
+          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0   /* always visible on desktop */
         `}
       >
         {/* Brand Header */}
@@ -79,6 +92,7 @@ function Layout() {
             <Link
               to="/products"
               className={navLinkClass("/products")}
+              onClick={() => setIsMobileOpen(false)} // close on mobile after navigation
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -89,6 +103,7 @@ function Layout() {
             <Link
               to="/users"
               className={navLinkClass("/users")}
+              onClick={() => setIsMobileOpen(false)}
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -99,6 +114,7 @@ function Layout() {
             <Link
               to="/carts"
               className={navLinkClass("/carts")}
+              onClick={() => setIsMobileOpen(false)}
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -108,8 +124,8 @@ function Layout() {
           </div>
         </nav>
 
-        {/* Collapse Toggle */}
-        <div className="p-2 border-t border-white/5">
+        {/* Collapse Toggle (visible on md+) */}
+        <div className="hidden md:block p-2 border-t border-white/5">
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="w-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 rounded-lg p-2 transition-colors cursor-pointer"
@@ -123,14 +139,35 @@ function Layout() {
             </svg>
           </button>
         </div>
+        {/* Close button for mobile (inside sidebar) */}
+        <button
+          onClick={() => setIsMobileOpen(false)}
+          className="md:hidden absolute top-4 right-4 text-slate-400 hover:text-white"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </aside>
 
-      {/* ===== MAIN CONTENT – margin adjusts with sidebar ===== */}
+      {/* ===== MAIN CONTENT ===== */}
       <div className={`flex-1 flex flex-col min-w-0 w-full bg-[#0b0b12] overflow-x-hidden transition-all duration-300 ${contentMargin}`}>
         
-        {/* Header with Avatar Dropdown */}
-        <header className="h-16 bg-[#0b0b12] border-b border-white/5 flex items-center justify-end px-4 sm:px-6 lg:px-8 shrink-0 relative">
-          <div className="flex items-center gap-4">
+        {/* Header with Hamburger (mobile) + Avatar Dropdown */}
+        <header className="h-16 bg-[#0b0b12] border-b border-white/5 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 relative">
+          {/* Left side: Hamburger on mobile */}
+          <button
+            onClick={() => setIsMobileOpen(true)}
+            className="md:hidden text-slate-400 hover:text-white transition-colors cursor-pointer"
+            aria-label="Open menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          {/* Right side: Avatar & dropdown */}
+          <div className="flex items-center gap-4 ml-auto">
             <div className="relative">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
