@@ -162,7 +162,7 @@ function Layout() {
         {/* Header with Hamburger + Welcome Message + Avatar */}
         <header className="min-h-16 bg-[#0b0b12] border-b border-white/5 flex items-center px-3 sm:px-6 lg:px-8 shrink-0 relative">
           
-          {/* LEFT: Hamburger on mobile (visible on all screens, but hidden on desktop) */}
+          {/* LEFT: Hamburger on mobile */}
           <button
             onClick={() => setIsMobileOpen(true)}
             className="md:hidden text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
@@ -173,9 +173,9 @@ function Layout() {
             </svg>
           </button>
 
-          {/* CENTER: Welcome Message - Visible on ALL screens (mobile + desktop) */}
+          {/* CENTER: Welcome Message - No background rectangle */}
           <div className="flex-1 flex items-center justify-center px-2 sm:px-4 min-w-0">
-            <div className="flex items-center gap-2 sm:gap-3 bg-blue-600/10 border border-blue-500/20 rounded-xl px-2 sm:px-4 py-1 sm:py-1.5 max-w-full">
+            <div className="flex items-center gap-2 sm:gap-3 max-w-full">
               <span className="text-sm sm:text-base shrink-0">👋</span>
               <p className="text-xs sm:text-sm font-medium text-white truncate">
                 Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
