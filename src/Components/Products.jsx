@@ -1,23 +1,30 @@
 // src/Components/GetAllProducts.jsx
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 
 function Products() {
-  // ---------- Local sorting state (no context) ----------
-  const [sortBy, setSortBy] = useState("default");
-  const [sortOrder, setSortOrder] = useState("asc");
-
+  // ---------- State ----------
   const [products, setProducts] = useState([]);
-  const [allProductsCache, setAllProductsCache] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  // Pagination (server-side)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
+  // Sorting (server-side)
+  const [sortBy, setSortBy] = useState("title");
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  // Search
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Category
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [categories, setCategories] = useState(["all"]);
+
+  // Add/Edit/Delete forms (unchanged)
   const [showAddForm, setShowAddForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -31,115 +38,84 @@ function Products() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Extract unique categories
-  const categories = useMemo(() => {
-    const cats = allProductsCache.map((p) => p.category).filter(Boolean);
-    return ["all", ...new Set(cats)];
-  }, [allProductsCache]);
+  // ---------- Fetch categories (NEW) ----------
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch("https://dummyjson.com/products/category-list");
+        if (!res.ok) throw new Error("Failed to fetch categories");
+        const data = await res.json();
+        setCategories(["all", ...data]);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+        setCategories(["all"]);
+      }
+    };
+    fetchCategories();
+  }, []);
 
-  // ---------- Fetch all products ----------
-  const fetchAllProducts = useCallback(async () => {
+  // ---------- Main fetch function (UPGRADED: uses server-side pagination, sorting, category) ----------
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://dummyjson.com/products?limit=0");
+      setError(null);
+
+      const skip = (currentPage - 1) * itemsPerPage;
+      const limit = itemsPerPage;
+
+      // Build the URL based on search/category
+      let baseUrl = "https://dummyjson.com/products";
+      const trimmedSearch = searchTerm.trim();
+
+      if (trimmedSearch) {
+        // ✅ API: /products/search?q=phone
+        baseUrl = `https://dummyjson.com/products/search?q=${encodeURIComponent(trimmedSearch)}`;
+      } else if (selectedCategory !== "all") {
+        // ✅ API: /products/category/smartphones
+        baseUrl = `https://dummyjson.com/products/category/${encodeURIComponent(selectedCategory)}`;
+      }
+
+      // ✅ API: ?limit=10&skip=10&select=title,price
+      // ✅ API: ?sortBy=title&order=asc
+      const params = new URLSearchParams();
+      params.append("limit", limit);
+      params.append("skip", skip);
+      params.append("select", "id,title,price,thumbnail,category,rating,stock");
+      params.append("sortBy", sortBy);
+      params.append("order", sortOrder);
+
+      const separator = baseUrl.includes("?") ? "&" : "?";
+      const fullUrl = `${baseUrl}${separator}${params.toString()}`;
+
+      const res = await fetch(fullUrl);
       if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
       const data = await res.json();
-      const all = data.products || [];
-      setAllProductsCache(all);
-      setProducts(all);
+
+      setProducts(data.products || []);
+      setTotal(data.total || 0);
     } catch (err) {
       setError(err.message || "Failed to fetch products");
+      setProducts([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, itemsPerPage, sortBy, sortOrder, searchTerm, selectedCategory]);
 
-  // ---------- Search with fallback ----------
-  const searchProductsAPI = useCallback(
-    async (query) => {
-      try {
-        setIsSearching(true);
-        setError(null);
-        const trimmedQuery = query.trim();
-        if (!trimmedQuery) {
-          setProducts(allProductsCache);
-          setIsSearching(false);
-          return;
-        }
+  // ---------- Trigger fetch when dependencies change ----------
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
-        const res = await fetch(
-          `https://dummyjson.com/products/search?q=${encodeURIComponent(trimmedQuery)}&limit=0`,
-        );
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-        const data = await res.json();
+  // ---------- Reset page when filters change ----------
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, sortBy, sortOrder]);
 
-        if (data.products.length === 0 && allProductsCache.length > 0) {
-          const fallback = allProductsCache.filter((p) => {
-            const term = trimmedQuery.toLowerCase();
-            const title = (p.title || "").toLowerCase();
-            const category = (p.category || "")
-              .toLowerCase()
-              .replace(/-/g, " ");
-            const description = (p.description || "").toLowerCase();
-            return (
-              title.includes(term) ||
-              category.includes(term) ||
-              description.includes(term)
-            );
-          });
-          setProducts(fallback);
-        } else {
-          setProducts(data.products || []);
-        }
-      } catch (err) {
-        if (allProductsCache.length > 0) {
-          const term = query.trim().toLowerCase();
-          const fallback = allProductsCache.filter((p) => {
-            const title = (p.title || "").toLowerCase();
-            const category = (p.category || "")
-              .toLowerCase()
-              .replace(/-/g, " ");
-            const description = (p.description || "").toLowerCase();
-            return (
-              title.includes(term) ||
-              category.includes(term) ||
-              description.includes(term)
-            );
-          });
-          setProducts(fallback);
-        } else {
-          setProducts([]);
-        }
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [allProductsCache],
-  );
+  // ---------- Pagination ----------
+  const totalPages = Math.ceil(total / itemsPerPage) || 1;
 
-  // ---------- Delete ----------
-  const handleDeleteProduct = async (id, e) => {
-    e.preventDefault();
-    if (!window.confirm("Are you sure you want to delete this product?"))
-      return;
-
-    try {
-      const res = await fetch(`https://dummyjson.com/products/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-      const data = await res.json();
-      console.log("Deleted successfully:", data);
-
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      setAllProductsCache((prev) => prev.filter((p) => p.id !== id));
-    } catch (err) {
-      console.error("Failed to delete product:", err);
-      alert("Failed to delete the product. Please try again.");
-    }
-  };
-
-  // ---------- Add ----------
+  // ---------- Add Product (unchanged) ----------
   const handleAddProductSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.price) {
@@ -149,6 +125,7 @@ function Products() {
 
     try {
       setIsSubmitting(true);
+      // ✅ API: POST /products/add
       const res = await fetch("https://dummyjson.com/products/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,8 +143,7 @@ function Products() {
       const newProduct = await res.json();
       console.log("Added successfully:", newProduct);
 
-      setProducts((prev) => [newProduct, ...prev]);
-      setAllProductsCache((prev) => [newProduct, ...prev]);
+      await fetchProducts();
 
       setFormData({
         title: "",
@@ -185,7 +161,28 @@ function Products() {
     }
   };
 
-  // ---------- Edit (start) ----------
+  // ---------- Delete Product (unchanged) ----------
+  const handleDeleteProduct = async (id, e) => {
+    e.preventDefault();
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
+
+    try {
+      // ✅ API: DELETE /products/1
+      const res = await fetch(`https://dummyjson.com/products/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const data = await res.json();
+      console.log("Deleted successfully:", data);
+
+      await fetchProducts();
+    } catch (err) {
+      console.error("Failed to delete product:", err);
+      alert("Failed to delete the product. Please try again.");
+    }
+  };
+
+  // ---------- Edit (start) (unchanged) ----------
   const handleEditClick = (product, e) => {
     e.preventDefault();
     setEditingProduct({
@@ -199,7 +196,7 @@ function Products() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ---------- Update ----------
+  // ---------- Update Product (unchanged) ----------
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
     if (!editingProduct.title.trim() || !editingProduct.price) {
@@ -209,6 +206,7 @@ function Products() {
 
     try {
       setIsUpdating(true);
+      // ✅ API: PUT /products/1
       const res = await fetch(
         `https://dummyjson.com/products/${editingProduct.id}`,
         {
@@ -227,12 +225,7 @@ function Products() {
       const updatedData = await res.json();
       console.log("Updated successfully:", updatedData);
 
-      setProducts((prev) =>
-        prev.map((p) => (p.id === updatedData.id ? updatedData : p)),
-      );
-      setAllProductsCache((prev) =>
-        prev.map((p) => (p.id === updatedData.id ? updatedData : p)),
-      );
+      await fetchProducts();
 
       alert("Product updated successfully!");
       setEditingProduct(null);
@@ -244,107 +237,24 @@ function Products() {
     }
   };
 
-  // ---------- useEffect hooks ----------
-  useEffect(() => {
-    fetchAllProducts();
-  }, [fetchAllProducts]);
-
-  useEffect(() => {
-    if (allProductsCache.length > 0 && searchTerm.trim()) {
-      searchProductsAPI(searchTerm);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allProductsCache]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm.trim()) {
-        searchProductsAPI(searchTerm);
-      } else {
-        setProducts(allProductsCache);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm, searchProductsAPI, allProductsCache]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedCategory, sortBy, sortOrder]);
-
-  // ---------- Processing pipeline ----------
-  const getProcessedProducts = useCallback(() => {
-    let processed = products;
-
-    if (selectedCategory !== "all") {
-      processed = processed.filter((p) => p.category === selectedCategory);
-    }
-
-    if (sortBy === "default") return processed;
-
-    const sorted = [...processed];
-    switch (sortBy) {
-      case "title":
-        sorted.sort((a, b) => {
-          const nameA = (a.title || "").toLowerCase();
-          const nameB = (b.title || "").toLowerCase();
-          return sortOrder === "asc"
-            ? nameA.localeCompare(nameB)
-            : nameB.localeCompare(nameA);
-        });
-        break;
-      case "price":
-        sorted.sort((a, b) => {
-          return sortOrder === "asc" ? a.price - b.price : b.price - a.price;
-        });
-        break;
-      case "rating":
-        sorted.sort((a, b) => {
-          const ratingA = a.rating || 0;
-          const ratingB = b.rating || 0;
-          return sortOrder === "asc" ? ratingA - ratingB : ratingB - ratingA;
-        });
-        break;
-      default:
-        break;
-    }
-    return sorted;
-  }, [products, selectedCategory, sortBy, sortOrder]);
-
-  const processedProducts = getProcessedProducts();
-
-  // ---------- Pagination ----------
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentProducts = processedProducts.slice(
-    indexOfFirstItem,
-    indexOfLastItem,
-  );
-
-  const calculatedTotalPages =
-    Math.ceil(processedProducts.length / itemsPerPage) || 1;
-  const totalPages = Math.min(calculatedTotalPages, 10);
-
   // ---------- Render ----------
   return (
     <div className="flex flex-col min-h-full justify-start bg-gray-950 px-3 sm:px-6 pb-3 sm:pb-6 pt-0 rounded-2xl sm:rounded-3xl border border-gray-800 shadow-2xl overflow-x-hidden gap-0">
-      {/* ========== INLINE HEADER ========== */}
+      {/* Header */}
       <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm pt-4 pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
-        {/* Left: Title & Add button */}
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-white tracking-tight">
-            Products Management
-          </h2>
+          <h2 className="text-lg font-bold text-white tracking-tight">Products Management</h2>
         </div>
 
-        {/* Right: Filters & Search */}
         <div className="flex flex-wrap items-center gap-2 ml-auto">
-          {/* Category filter */}
           <button
             onClick={() => setShowAddForm(true)}
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
           >
             + Add New
           </button>
+
+          {/* Category filter - now uses server-side /category/{slug} */}
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -357,16 +267,15 @@ function Products() {
             ))}
           </select>
 
-          {/* Sorting */}
+          {/* Sorting - now uses server-side sortBy & order */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
           >
-            <option value="default">Sort by</option>
-            <option value="title">Title</option>
-            <option value="price">Price</option>
-            <option value="rating">Rating</option>
+            <option value="title">Sort by Title</option>
+            <option value="price">Sort by Price</option>
+            <option value="rating">Sort by Rating</option>
           </select>
           <button
             onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
@@ -375,7 +284,7 @@ function Products() {
             {sortOrder === "asc" ? "↑" : "↓"}
           </button>
 
-          {/* Search */}
+          {/* Search - uses /search?q= */}
           <input
             type="text"
             placeholder="Search products..."
@@ -394,7 +303,7 @@ function Products() {
         </div>
       </div>
 
-      {/* INLINE EDIT FORM */}
+      {/* Edit Form (unchanged) */}
       {editingProduct && (
         <div className="bg-gray-900 border border-amber-500/40 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
@@ -409,90 +318,52 @@ function Products() {
             </button>
           </div>
 
-          <form
-            onSubmit={handleUpdateSubmit}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
+          <form onSubmit={handleUpdateSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Product Title *
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product Title *</label>
               <input
                 type="text"
                 value={editingProduct.title}
-                onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct,
-                    title: e.target.value,
-                  })
-                }
+                onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
                 required
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Price ($) *
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Price ($) *</label>
               <input
                 type="number"
                 step="0.01"
                 value={editingProduct.price}
-                onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct,
-                    price: e.target.value,
-                  })
-                }
+                onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
                 required
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Category
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Category</label>
               <input
                 type="text"
                 value={editingProduct.category}
-                onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct,
-                    category: e.target.value,
-                  })
-                }
+                onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Product URL (Image)
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product URL (Image)</label>
               <input
                 type="url"
                 value={editingProduct.thumbnail}
-                onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct,
-                    thumbnail: e.target.value,
-                  })
-                }
+                onChange={(e) => setEditingProduct({ ...editingProduct, thumbnail: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Description
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Description</label>
               <input
                 type="text"
                 value={editingProduct.description}
-                onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct,
-                    description: e.target.value,
-                  })
-                }
+                onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
               />
             </div>
@@ -516,13 +387,11 @@ function Products() {
         </div>
       )}
 
-      {/* INLINE ADD FORM */}
+      {/* Add Form (unchanged) */}
       {showAddForm && (
         <div className="bg-gray-900 border border-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
-            <h2 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
-              Add New Product Form
-            </h2>
+            <h2 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Add New Product Form</h2>
             <button
               onClick={() => setShowAddForm(false)}
               className="text-gray-400 hover:text-white text-xs font-semibold px-2 py-1 bg-gray-950 rounded-lg border border-gray-800 cursor-pointer"
@@ -531,80 +400,57 @@ function Products() {
             </button>
           </div>
 
-          <form
-            onSubmit={handleAddProductSubmit}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
+          <form onSubmit={handleAddProductSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Product Title *
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product Title *</label>
               <input
                 type="text"
                 placeholder="e.g. BMW Pencil"
                 value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 required
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Price ($) *
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Price ($) *</label>
               <input
                 type="number"
                 step="0.01"
                 placeholder="e.g. 10"
                 value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Category
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Category</label>
               <input
                 type="text"
                 placeholder="e.g. stationery"
                 value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Product URL (Image)
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product URL (Image)</label>
               <input
                 type="url"
                 placeholder="https://example.com/image.jpg"
                 value={formData.thumbnail}
-                onChange={(e) =>
-                  setFormData({ ...formData, thumbnail: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">
-                Description
-              </label>
+              <label className="block text-[11px] font-medium text-gray-300 mb-1">Description</label>
               <input
                 type="text"
                 placeholder="Product description..."
                 value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -628,28 +474,20 @@ function Products() {
         </div>
       )}
 
-      {/* LOADING STATE */}
-      {(loading || isSearching) && (
+      {/* Loading / Error / Grid */}
+      {loading && (
         <div className="flex flex-col justify-center items-center min-h-[250px] sm:min-h-[350px] space-y-3 bg-gray-900/30 border border-gray-800/40 rounded-2xl">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-medium text-gray-400 tracking-wider uppercase">
-            {loading ? "Loading Products..." : "Searching..."}
-          </p>
+          <p className="text-xs font-medium text-gray-400 tracking-wider uppercase">Loading Products...</p>
         </div>
       )}
 
-      {/* ERROR STATE */}
-      {error && !loading && !isSearching && (
+      {error && !loading && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 sm:p-8 rounded-2xl text-center my-4 shadow-xl">
-          <p className="font-semibold text-base text-red-300">
-            Oops! Something went wrong.
-          </p>
+          <p className="font-semibold text-base text-red-300">Oops! Something went wrong.</p>
           <p className="text-xs mt-1 text-gray-400">{error}</p>
           <button
-            onClick={() => {
-              setError(null);
-              fetchAllProducts();
-            }}
+            onClick={() => fetchProducts()}
             className="mt-4 sm:mt-5 px-4 sm:px-5 py-2 sm:py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-all shadow-md shadow-red-600/30"
           >
             Try Again
@@ -657,20 +495,17 @@ function Products() {
         </div>
       )}
 
-      {/* PRODUCT GRID */}
-      {!loading && !isSearching && !error && (
+      {!loading && !error && (
         <>
-          {processedProducts.length === 0 ? (
+          {products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 sm:py-20 bg-gray-900/30 border border-gray-800/60 rounded-2xl text-gray-400 space-y-3 shadow-inner">
               <span className="text-4xl">📦</span>
-              <p className="text-sm font-medium">
-                No products found matching your current filter criteria.
-              </p>
+              <p className="text-sm font-medium">No products found matching your criteria.</p>
               <button
                 onClick={() => {
                   setSearchTerm("");
                   setSelectedCategory("all");
-                  setSortBy("default");
+                  setSortBy("title");
                 }}
                 className="text-xs text-blue-400 hover:text-blue-300 underline font-medium transition-colors"
               >
@@ -680,7 +515,7 @@ function Products() {
           ) : (
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 xl:gap-6">
-                {currentProducts.map((p) => (
+                {products.map((p) => (
                   <div
                     key={p.id}
                     className="bg-gray-900 border border-gray-800/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl hover:border-gray-700 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
@@ -702,22 +537,14 @@ function Products() {
                         {p.title}
                       </h3>
                       <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] sm:text-xs text-gray-400">
-                          Price
-                        </span>
-                        <span className="text-blue-400 font-bold text-sm sm:text-base">
-                          ${p.price}
-                        </span>
+                        <span className="text-[10px] sm:text-xs text-gray-400">Price</span>
+                        <span className="text-blue-400 font-bold text-sm sm:text-base">${p.price}</span>
                       </div>
                       {p.rating && (
                         <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
-                          <span className="text-[10px] sm:text-xs text-gray-400">
-                            ⭐
-                          </span>
+                          <span className="text-[10px] sm:text-xs text-gray-400">⭐</span>
                           <span className="text-[10px] sm:text-xs text-gray-300">
-                            {typeof p.rating === "number"
-                              ? p.rating.toFixed(1)
-                              : p.rating}
+                            {typeof p.rating === "number" ? p.rating.toFixed(1) : p.rating}
                           </span>
                         </div>
                       )}
@@ -725,7 +552,7 @@ function Products() {
 
                     <div className="mt-3 sm:mt-4 pt-3 border-t border-gray-800/80 flex items-center gap-1.5">
                       <Link
-                        to={`/single-product/${p.id}`}
+                        to={`/products/${p.id}`}
                         className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-2 rounded-lg transition-all text-[10px] font-semibold border border-blue-500/30"
                         title="View Details"
                       >
@@ -750,38 +577,34 @@ function Products() {
                 ))}
               </div>
 
-              {/* PAGINATION */}
+              {/* Pagination - uses total from server */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-1.5 pt-4 border-t border-gray-800/80">
                   <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl text-xs disabled:opacity-40 hover:bg-gray-800 transition-all cursor-pointer"
                   >
                     Prev
                   </button>
-                  {Array.from({ length: totalPages }, (_, index) => {
-                    const pageNumber = index + 1;
+                  {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
+                    const page = i + 1;
                     return (
                       <button
-                        key={pageNumber}
-                        onClick={() => setCurrentPage(pageNumber)}
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
                         className={`w-8 h-8 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          currentPage === pageNumber
+                          currentPage === page
                             ? "bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-500"
                             : "bg-gray-900 border border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-white"
                         }`}
                       >
-                        {pageNumber}
+                        {page}
                       </button>
                     );
                   })}
                   <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
+                    onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl text-xs disabled:opacity-40 hover:bg-gray-800 transition-all cursor-pointer"
                   >

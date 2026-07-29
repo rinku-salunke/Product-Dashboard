@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 function Users() {
-  // ---------- State (unchanged) ----------
+  // ---------- State ----------
   const [users, setUsers] = useState([]);
+  const [totalUsers, setTotalUsers] = useState(0); // 🆕 for server pagination
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -22,7 +23,7 @@ function Users() {
   const [isFiltering, setIsFiltering] = useState(false);
   const [filterError, setFilterError] = useState(null);
 
-  // Pagination
+  // Pagination (shared across modes)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -32,16 +33,37 @@ function Users() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
 
-  // 🛒 User carts
+  // User carts
   const [userCarts, setUserCarts] = useState(null);
   const [cartsLoading, setCartsLoading] = useState(false);
   const [cartsError, setCartsError] = useState(null);
   const [showCarts, setShowCarts] = useState(false);
 
-  // Ref
+  // ---------- Modal state for Add / Edit ----------
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    age: "",
+    email: "",
+    phone: "",
+    username: "",
+    password: "",
+  });
+  const [mutationLoading, setMutationLoading] = useState(false);
+  const [mutationError, setMutationError] = useState(null);
+
+  // Ref for filter value input
   const valueInputRef = useRef(null);
 
-  // Filter keys (unchanged)
+  // Ref to keep latest users list for use in callbacks
+  const usersRef = useRef(users);
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
+  // Filter keys
   const filterKeys = [
     {
       label: "Hair Color",
@@ -61,29 +83,35 @@ function Users() {
 
   const [sortBy, order] = sortOption ? sortOption.split("_") : [null, null];
 
-  // ---------- Fetch all users (unchanged) ----------
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        let url = "https://dummyjson.com/users";
-        if (sortBy && order) {
-          url += `?sortBy=${sortBy}&order=${order}`;
-        }
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-        const data = await res.json();
-        setUsers(data.users || []);
-      } catch (err) {
-        setError(err.message || "Failed to load users");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
-  }, [sortBy, order]);
+  // ---------- Select fields for list ----------
+  const SELECT_FIELDS = "id,firstName,lastName,age,email,phone,username,role,image";
 
-  // ---------- Search (unchanged) ----------
+  // ---------- Fetch users (server‑side pagination) ----------
+  const fetchUsers = useCallback(async (page = 1) => {
+    try {
+      setLoading(true);
+      let url = `https://dummyjson.com/users?limit=${itemsPerPage}&skip=${(page - 1) * itemsPerPage}&select=${SELECT_FIELDS}`;
+      if (sortBy && order) {
+        url += `&sortBy=${sortBy}&order=${order}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const data = await res.json();
+      setUsers(data.users || []);
+      setTotalUsers(data.total || 0);
+    } catch (err) {
+      setError(err.message || "Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  }, [sortBy, order, itemsPerPage]);
+
+  // Fetch when sort or page changes
+  useEffect(() => {
+    fetchUsers(currentPage);
+  }, [fetchUsers, currentPage]);
+
+  // ---------- Search (client‑side pagination) ----------
   const searchUsers = useCallback(
     async (query) => {
       const trimmed = query.trim();
@@ -103,7 +131,43 @@ function Users() {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
-        setSearchedUsers(data.users || []);
+        const apiUsers = data.users || [];
+
+        // Local client‑side search on the current users list
+        const localUsers = usersRef.current.filter((u) =>
+          u.firstName?.toLowerCase().includes(trimmed.toLowerCase()) ||
+          u.lastName?.toLowerCase().includes(trimmed.toLowerCase()) ||
+          u.email?.toLowerCase().includes(trimmed.toLowerCase()) ||
+          u.username?.toLowerCase().includes(trimmed.toLowerCase())
+        );
+
+        // Merge: API users first, then local users not already present
+        const apiIds = new Set(apiUsers.map((u) => u.id));
+        const combined = [...apiUsers];
+        for (const localUser of localUsers) {
+          if (!apiIds.has(localUser.id)) {
+            combined.push(localUser);
+          }
+        }
+
+        // Remove any user that is no longer in the main users list (e.g., deleted)
+        const currentIds = new Set(usersRef.current.map((u) => u.id));
+        const finalResults = combined.filter((u) => currentIds.has(u.id));
+
+        // Apply sorting if any
+        if (sortBy && order) {
+          finalResults.sort((a, b) => {
+            let valA = a[sortBy] ?? "";
+            let valB = b[sortBy] ?? "";
+            if (typeof valA === "string") valA = valA.toLowerCase();
+            if (typeof valB === "string") valB = valB.toLowerCase();
+            if (valA < valB) return order === "asc" ? -1 : 1;
+            if (valA > valB) return order === "asc" ? 1 : -1;
+            return 0;
+          });
+        }
+
+        setSearchedUsers(finalResults);
       } catch (err) {
         setSearchError(err.message || "Search failed");
         setSearchedUsers([]);
@@ -111,7 +175,7 @@ function Users() {
         setIsSearching(false);
       }
     },
-    [sortBy, order],
+    [sortBy, order]
   );
 
   useEffect(() => {
@@ -121,7 +185,7 @@ function Users() {
     return () => clearTimeout(timer);
   }, [searchTerm, searchUsers]);
 
-  // ---------- Filter (unchanged) ----------
+  // ---------- Filter (client‑side pagination) ----------
   const filterUsers = useCallback(
     async (key, value) => {
       if (!key || !value) {
@@ -137,9 +201,36 @@ function Users() {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
-        let results = data.users || [];
+        let apiUsers = data.users || [];
+
+        // Local client‑side filter on the current users list
+        const localUsers = usersRef.current.filter((u) => {
+          let val;
+          if (key.includes('.')) {
+            const parts = key.split('.');
+            val = parts.reduce((obj, k) => obj?.[k], u);
+          } else {
+            val = u[key];
+          }
+          return String(val).toLowerCase() === value.toLowerCase();
+        });
+
+        // Merge: API users first, then local users not already present
+        const apiIds = new Set(apiUsers.map((u) => u.id));
+        const combined = [...apiUsers];
+        for (const localUser of localUsers) {
+          if (!apiIds.has(localUser.id)) {
+            combined.push(localUser);
+          }
+        }
+
+        // Remove any user that is no longer in the main users list
+        const currentIds = new Set(usersRef.current.map((u) => u.id));
+        let finalResults = combined.filter((u) => currentIds.has(u.id));
+
+        // Apply sorting if any
         if (sortBy && order) {
-          results.sort((a, b) => {
+          finalResults.sort((a, b) => {
             let valA = a[sortBy] ?? "";
             let valB = b[sortBy] ?? "";
             if (typeof valA === "string") valA = valA.toLowerCase();
@@ -149,7 +240,8 @@ function Users() {
             return 0;
           });
         }
-        setFilteredUsers(results);
+
+        setFilteredUsers(finalResults);
       } catch (err) {
         setFilterError(err.message || "Filter failed");
         setFilteredUsers([]);
@@ -157,7 +249,7 @@ function Users() {
         setIsFiltering(false);
       }
     },
-    [sortBy, order],
+    [sortBy, order]
   );
 
   useEffect(() => {
@@ -174,22 +266,27 @@ function Users() {
     }
   }, [filterKey]);
 
-  // ---------- Determine which users to display (unchanged) ----------
+  // ---------- Determine which users to display ----------
   let displayUsers = users;
   let isDisplayLoading = loading;
   let displayError = error;
+
+  // 🆕 For total pages: server total for main, client length for search/filter
+  let totalItems = totalUsers;
 
   if (filterKey && filterValue) {
     displayUsers = filteredUsers;
     isDisplayLoading = isFiltering;
     displayError = filterError;
+    totalItems = displayUsers.length; // client‑side total
   } else if (searchTerm.trim()) {
     displayUsers = searchedUsers;
     isDisplayLoading = isSearching;
     displayError = searchError;
+    totalItems = displayUsers.length; // client‑side total
   }
 
-  // ---------- Fetch single user (unchanged) ----------
+  // ---------- Fetch single user detail ----------
   useEffect(() => {
     if (selectedUserId === null) {
       setSelectedUser(null);
@@ -203,7 +300,7 @@ function Users() {
         setDetailLoading(true);
         setDetailError(null);
         const res = await fetch(
-          `https://dummyjson.com/users/${selectedUserId}`,
+          `https://dummyjson.com/users/${selectedUserId}`
         );
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
@@ -218,7 +315,7 @@ function Users() {
     fetchUserDetail();
   }, [selectedUserId]);
 
-  // ---------- Fetch user carts (unchanged) ----------
+  // ---------- Fetch user carts ----------
   useEffect(() => {
     if (showCarts && selectedUserId) {
       const fetchCarts = async () => {
@@ -244,9 +341,10 @@ function Users() {
     }
   }, [showCarts, selectedUserId]);
 
-  // ---------- Pagination (unchanged) ----------
-  const totalUsers = displayUsers.length;
-  const totalPages = Math.min(Math.ceil(totalUsers / itemsPerPage), 10);
+  // ---------- Pagination ----------
+  const totalPages = Math.min(Math.ceil(totalItems / itemsPerPage), 10);
+  // For client‑side modes, we slice displayUsers; for main, users is already paginated from server.
+  // But we keep slicing for consistency (main users length will be <= itemsPerPage).
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentUsers = displayUsers.slice(startIndex, endIndex);
@@ -257,7 +355,7 @@ function Users() {
     }
   };
 
-  // ---------- Handlers (unchanged) ----------
+  // ---------- Handlers for CRUD operations ----------
   const handleUserClick = (userId) => {
     setSelectedUserId(userId);
   };
@@ -268,6 +366,7 @@ function Users() {
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
+    setCurrentPage(1); // reset page on new search
     if (filterKey && filterValue) {
       setFilterKey("");
       setFilterValue("");
@@ -278,11 +377,13 @@ function Users() {
     setSearchTerm("");
     setSearchedUsers([]);
     setSearchError(null);
+    setCurrentPage(1);
   };
 
   const handleFilterKeyChange = (e) => {
     setFilterKey(e.target.value);
     setFilterValue("");
+    setCurrentPage(1);
     if (searchTerm) {
       setSearchTerm("");
     }
@@ -297,28 +398,153 @@ function Users() {
     setFilterValue("");
     setFilteredUsers([]);
     setFilterError(null);
+    setCurrentPage(1);
   };
 
   const handleSortOptionChange = (e) => {
     setSortOption(e.target.value);
+    setCurrentPage(1); // reset page when sorting changes
   };
 
   const toggleCarts = () => {
     setShowCarts((prev) => !prev);
   };
 
-  // ---------- 🆕 NEW action handlers (Add/Edit/Delete) ----------
-  const handleAddUser = () => {
-    alert("Add User clicked – implement your modal or navigation here.");
+  // ---------- Modal handlers ----------
+  const openAddModal = () => {
+    setEditingUserId(null);
+    setFormData({
+      firstName: "",
+      lastName: "",
+      age: "",
+      email: "",
+      phone: "",
+      username: "",
+      password: "",
+    });
+    setMutationError(null);
+    setIsModalOpen(true);
   };
 
-  const handleEditUser = (userId) => {
-    alert(`Edit user with ID: ${userId}`);
+  const openEditModal = (user) => {
+    setEditingUserId(user.id);
+    setFormData({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      age: user.age,
+      email: user.email,
+      phone: user.phone,
+      username: user.username,
+      password: "",
+    });
+    setMutationError(null);
+    setIsModalOpen(true);
   };
 
-  const handleDeleteUser = (userId) => {
-    if (window.confirm(`Are you sure you want to delete user ${userId}?`)) {
-      alert(`Delete user ID: ${userId}`);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingUserId(null);
+    setFormData({
+      firstName: "",
+      lastName: "",
+      age: "",
+      email: "",
+      phone: "",
+      username: "",
+      password: "",
+    });
+    setMutationError(null);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ---------- Submit Add / Update ----------
+  const handleSubmitUser = async (e) => {
+    e.preventDefault();
+    setMutationLoading(true);
+    setMutationError(null);
+
+    try {
+      const payload = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        age: parseInt(formData.age) || 0,
+        email: formData.email,
+        phone: formData.phone,
+        username: formData.username,
+        password: formData.password || "dummy123",
+      };
+
+      let url, method;
+      if (editingUserId) {
+        url = `https://dummyjson.com/users/${editingUserId}`;
+        method = "PUT";
+        delete payload.password;
+      } else {
+        url = "https://dummyjson.com/users/add";
+        method = "POST";
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+
+      const result = await res.json();
+      console.log("User saved:", result);
+
+      if (editingUserId) {
+        setUsers((prev) => prev.map((u) => (u.id === result.id ? result : u)));
+      } else {
+        setUsers((prev) => [result, ...prev]);
+        // Increase totalUsers count for pagination (if not searching/filtering)
+        setTotalUsers((prev) => prev + 1);
+      }
+
+      closeModal();
+    } catch (err) {
+      setMutationError(err.message || "Failed to save user");
+    } finally {
+      setMutationLoading(false);
+    }
+  };
+
+  // ---------- Delete user ----------
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm(`Are you sure you want to delete user ${userId}?`)) {
+      return;
+    }
+
+    try {
+      setMutationLoading(true);
+      const res = await fetch(`https://dummyjson.com/users/${userId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+
+      const result = await res.json();
+      console.log("Deleted user:", result);
+
+      // Remove from main list
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setTotalUsers((prev) => Math.max(prev - 1, 0));
+      // Also clean up search & filter results
+      setSearchedUsers((prev) => prev.filter((u) => u.id !== userId));
+      setFilteredUsers((prev) => prev.filter((u) => u.id !== userId));
+
+      if (selectedUserId === userId) {
+        handleBackToList();
+      }
+    } catch (err) {
+      alert("Delete failed: " + err.message);
+    } finally {
+      setMutationLoading(false);
     }
   };
 
@@ -327,8 +553,8 @@ function Users() {
   const currentFilterExamples =
     filterKeys.find((k) => k.value === filterKey)?.examples || "";
 
-  // ---------- Loading & Error for list (unchanged) ----------
-  if (loading) {
+  // ---------- Loading & Error for list ----------
+  if (loading && !users.length && !searchTerm && !filterKey) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -337,7 +563,7 @@ function Users() {
     );
   }
 
-  if (error) {
+  if (error && !users.length) {
     return (
       <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 rounded-2xl text-center">
         <p className="font-semibold">Oops! Something went wrong.</p>
@@ -352,7 +578,7 @@ function Users() {
     );
   }
 
-  // ---------- Detail View (unchanged) ----------
+  // ---------- Detail View ----------
   if (selectedUserId !== null) {
     if (detailLoading) {
       return (
@@ -466,7 +692,7 @@ function Users() {
             </div>
           </div>
 
-          {/* 🛒 View Carts Button */}
+          {/* Carts Button */}
           <div className="mt-6 pt-4 border-t border-gray-800">
             <button
               onClick={toggleCarts}
@@ -534,15 +760,15 @@ function Users() {
     );
   }
 
-  // ---------- List View (modified: added "Add User" and card action buttons) ----------
+  // ---------- List View ----------
   return (
     <div className="space-y-6">
+      {/* Top bar: heading + Add button + controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        {/* 👇 Added "Add User" button inside a flex container */}
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-white">Manage User Accounts</h2>
           <button
-            onClick={handleAddUser}
+            onClick={openAddModal}
             className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-sm rounded-xl transition border border-emerald-500/30 flex items-center gap-1"
           >
             <span>+</span> Add User
@@ -622,7 +848,7 @@ function Users() {
         </div>
       </div>
 
-      {/* Active filters/search (unchanged) */}
+      {/* Active filters/search info */}
       {filterKey && filterValue && (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-400">Filtering by:</span>
@@ -726,7 +952,7 @@ function Users() {
                     <span className="capitalize">{user.role}</span>
                   </p>
                 </div>
-                {/* 👇 Modified footer: added Edit & Delete buttons */}
+                {/* Action buttons */}
                 <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between">
                   <span className="text-blue-400 text-xs font-medium hover:underline">
                     View Profile →
@@ -735,7 +961,7 @@ function Users() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleEditUser(user.id);
+                        openEditModal(user);
                       }}
                       className="text-xs text-yellow-400 hover:text-yellow-300 transition"
                     >
@@ -793,6 +1019,118 @@ function Users() {
             </div>
           )}
         </>
+      )}
+
+      {/* ---------- Modal for Add / Edit ---------- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-white mb-4">
+              {editingUserId ? "Edit User" : "Add New User"}
+            </h3>
+            {mutationError && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-sm mb-4">
+                {mutationError}
+              </div>
+            )}
+            <form onSubmit={handleSubmitUser} className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">First Name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleFormChange}
+                  required
+                  className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleFormChange}
+                  required
+                  className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Age</label>
+                <input
+                  type="number"
+                  name="age"
+                  value={formData.age}
+                  onChange={handleFormChange}
+                  required
+                  className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleFormChange}
+                  required
+                  className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Phone</label>
+                <input
+                  type="text"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleFormChange}
+                  className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Username</label>
+                <input
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleFormChange}
+                  required
+                  className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              {!editingUserId && (
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleFormChange}
+                    placeholder="optional, default 'dummy123'"
+                    className="w-full bg-gray-950 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={mutationLoading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-xl transition disabled:opacity-50"
+                >
+                  {mutationLoading ? "Saving..." : editingUserId ? "Update" : "Add"}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-semibold py-2 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

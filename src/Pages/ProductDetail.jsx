@@ -114,15 +114,6 @@ function ProductDetail() {
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="mt-8 flex gap-4">
-            <button className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-xl transition-colors shadow-sm text-sm">
-              Edit Product
-            </button>
-            <button className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-medium py-3 px-6 rounded-xl transition-colors text-sm border border-red-200">
-              Delete Product
-            </button>
-          </div>
         </div>
       </div>
     </div>
