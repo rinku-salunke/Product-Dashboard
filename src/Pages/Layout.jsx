@@ -34,42 +34,47 @@ function Layout() {
     }
   `;
 
-  // Sidebar width classes
-  const sidebarWidth = isSidebarCollapsed ? "w-20" : "w-64";
-  const contentMargin = isSidebarCollapsed ? "ml-20" : "ml-64";
+  // ✅ Responsive sidebar widths
+  const sidebarWidth = isSidebarCollapsed
+    ? "w-14 md:w-20"
+    : "w-48 md:w-64";
+  const contentMargin = isSidebarCollapsed
+    ? "ml-14 md:ml-20"
+    : "ml-48 md:ml-64";
 
   return (
     <div className="flex w-full min-h-screen bg-[#0b0b12] font-sans overflow-x-hidden text-slate-100">
       
-      {/* ===== SIDEBAR (always visible on all screens) ===== */}
+      {/* ===== SIDEBAR – always visible, responsive width ===== */}
       <aside
         className={`
-          fixed left-0 top-0 z-50 
-          bg-[#0b0b12] border-r border-white/5 flex flex-col shadow-2xl h-full 
+          fixed left-0 top-0 z-50 h-full
+          bg-[#0b0b12] border-r border-white/5 
+          flex flex-col shadow-2xl 
           transition-all duration-300 ease-in-out
           ${sidebarWidth}
         `}
       >
-        {/* Brand Header – hidden when collapsed */}
+        {/* Brand Header */}
         <div className={`
-          flex items-center gap-3 px-5 py-5 border-b border-white/5 shrink-0
-          ${isSidebarCollapsed ? "justify-center px-2" : ""}
+          flex items-center gap-3 px-3 py-5 border-b border-white/5 shrink-0
+          ${isSidebarCollapsed ? "justify-center" : "px-4"}
         `}>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-xl shadow-lg shadow-blue-500/20 ring-1 ring-white/10">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-xl shadow-lg shadow-blue-500/20 ring-1 ring-white/10 shrink-0">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
           {!isSidebarCollapsed && (
             <div className="flex-1 min-w-0">
-              <h1 className="text-sm font-bold text-white tracking-tight">E‑Commerce Admin</h1>
+              <h1 className="text-sm font-bold text-white tracking-tight truncate">E‑Commerce Admin</h1>
               <p className="text-[11px] text-slate-400 font-medium truncate">Management Dashboard</p>
             </div>
           )}
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-3 py-6 overflow-y-auto">
+        <nav className="flex-1 px-2 py-6 overflow-y-auto">
           <div className="space-y-1">
             <Link
               to="/products"
@@ -103,8 +108,8 @@ function Layout() {
           </div>
         </nav>
 
-        {/* Toggle button to collapse/expand sidebar */}
-        <div className="p-3 border-t border-white/5">
+        {/* Collapse Toggle */}
+        <div className="p-2 border-t border-white/5">
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="w-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 rounded-lg p-2 transition-colors cursor-pointer"
@@ -120,10 +125,10 @@ function Layout() {
         </div>
       </aside>
 
-      {/* ===== MAIN CONTENT AREA (with left margin for sidebar) ===== */}
+      {/* ===== MAIN CONTENT – margin adjusts with sidebar ===== */}
       <div className={`flex-1 flex flex-col min-w-0 w-full bg-[#0b0b12] overflow-x-hidden transition-all duration-300 ${contentMargin}`}>
         
-        {/* Top Header with Avatar Dropdown (always visible) */}
+        {/* Header with Avatar Dropdown */}
         <header className="h-16 bg-[#0b0b12] border-b border-white/5 flex items-center justify-end px-4 sm:px-6 lg:px-8 shrink-0 relative">
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -167,8 +172,8 @@ function Layout() {
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 w-full p-4 sm:p-6 md:p-6 lg:p-8 xl:p-10 bg-[#0b0b12] overflow-y-auto">
+        {/* Page Content – responsive padding */}
+        <main className="flex-1 w-full p-3 sm:p-4 md:p-6 lg:p-8 xl:p-10 bg-[#0b0b12] overflow-y-auto">
           <Outlet />
         </main>
       </div>
