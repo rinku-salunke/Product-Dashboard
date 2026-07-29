@@ -43,6 +43,10 @@ function Products() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // ---------- Get user info for welcome message ----------
+  const userFullName = localStorage.getItem("userFullName") || "User";
+  const userFirstName = localStorage.getItem("userFirstName") || "";
+
   // ---------- Fetch categories ----------
   useEffect(() => {
     const fetchCategories = async () => {
@@ -112,7 +116,6 @@ function Products() {
         if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         const data = await res.json();
 
-        // Filter out deleted products
         const filtered = filterDeleted(data.products || []);
         setProducts(filtered);
         setTotal(data.total || 0);
@@ -121,9 +124,7 @@ function Products() {
       }
 
       // ---- CASE 2: Search – fetch all matching from API, merge with local, client-side pagination ----
-      // Fetch all matching products from API (use a large limit)
       let searchUrl = `https://dummyjson.com/products/search?q=${encodeURIComponent(trimmedSearch)}&limit=100&select=id,title,price,thumbnail,category,rating,stock`;
-      // Add sorting if needed (API supports sortBy/order)
       searchUrl += `&sortBy=${sortBy}&order=${sortOrder}`;
 
       const res = await fetch(searchUrl);
@@ -131,16 +132,13 @@ function Products() {
       const data = await res.json();
 
       let apiProducts = data.products || [];
-      // Filter out deleted products
       apiProducts = filterDeleted(apiProducts);
 
-      // Filter local added products by search term
       const localMatches = localAddedProducts.filter((p) =>
         p.title?.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
         p.category?.toLowerCase().includes(trimmedSearch.toLowerCase())
       );
 
-      // Merge: API products first, then local products not already in API
       const apiIds = new Set(apiProducts.map((p) => p.id));
       const merged = [...apiProducts];
       for (const localProduct of localMatches) {
@@ -149,16 +147,14 @@ function Products() {
         }
       }
 
-      // Sort merged list (client-side) because API sorting may not be consistent with merged data
       const sorted = sortProducts(merged);
 
-      // Apply client-side pagination
       const start = (currentPage - 1) * itemsPerPage;
       const end = start + itemsPerPage;
       const paginated = sorted.slice(start, end);
 
       setProducts(paginated);
-      setTotal(sorted.length); // total is the full merged list length
+      setTotal(sorted.length);
 
     } catch (err) {
       setError(err.message || "Failed to fetch products");
@@ -215,13 +211,10 @@ function Products() {
       const newProduct = await res.json();
       console.log("Added successfully:", newProduct);
 
-      // Add to local added products
       setLocalAddedProducts((prev) => [newProduct, ...prev]);
-      // Also add to current list (if not searching, we'll show it immediately)
       setProducts((prev) => [newProduct, ...prev]);
       setTotal((prev) => prev + 1);
 
-      // Reset form
       setFormData({
         title: "",
         price: "",
@@ -244,17 +237,14 @@ function Products() {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
 
     try {
-      // Check if product is local (not on server)
       const isLocal = localAddedProducts.some((p) => p.id === id);
       if (isLocal) {
-        // Remove from local list
         setLocalAddedProducts((prev) => prev.filter((p) => p.id !== id));
         setProducts((prev) => prev.filter((p) => p.id !== id));
         setTotal((prev) => Math.max(prev - 1, 0));
         return;
       }
 
-      // Server product: call DELETE
       const res = await fetch(`https://dummyjson.com/products/${id}`, {
         method: "DELETE",
       });
@@ -262,7 +252,6 @@ function Products() {
       const data = await res.json();
       console.log("Deleted successfully:", data);
 
-      // Mark as deleted locally
       setDeletedProductIds((prev) => [...prev, id]);
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setTotal((prev) => Math.max(prev - 1, 0));
@@ -297,10 +286,8 @@ function Products() {
     try {
       setIsUpdating(true);
 
-      // Check if product is local (not on server)
       const isLocal = localAddedProducts.some((p) => p.id === editingProduct.id);
       if (isLocal) {
-        // Update locally
         const updated = { ...editingProduct };
         setLocalAddedProducts((prev) =>
           prev.map((p) => (p.id === updated.id ? updated : p))
@@ -314,7 +301,6 @@ function Products() {
         return;
       }
 
-      // Server product: call PUT
       const res = await fetch(
         `https://dummyjson.com/products/${editingProduct.id}`,
         {
@@ -333,7 +319,6 @@ function Products() {
       const updatedData = await res.json();
       console.log("Updated successfully:", updatedData);
 
-      // Update in main list
       setProducts((prev) =>
         prev.map((p) => (p.id === updatedData.id ? updatedData : p))
       );
@@ -350,7 +335,33 @@ function Products() {
   // ---------- Render ----------
   return (
     <div className="flex flex-col min-h-full justify-start bg-gray-950 px-3 sm:px-6 pb-3 sm:pb-6 pt-0 rounded-2xl sm:rounded-3xl border border-gray-800 shadow-2xl overflow-x-hidden gap-0">
-      {/* Header (unchanged) */}
+      
+      {/* 🎉 Welcome Message Section */}
+      <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-2xl p-4 sm:p-6 mt-3 mb-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl sm:text-4xl">👋</span>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-white">
+                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+                  {userFullName}
+                </span>
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-400">
+                You are successfully logged in. Manage your products below.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-green-500/20 border border-green-500/30 text-green-400 text-xs rounded-full flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              Online
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Header */}
       <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm pt-4 pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-white tracking-tight">Products Management</h2>
@@ -410,7 +421,7 @@ function Products() {
         </div>
       </div>
 
-      {/* Edit Form (unchanged) */}
+      {/* Edit Form */}
       {editingProduct && (
         <div className="bg-gray-900 border border-amber-500/40 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
@@ -494,7 +505,7 @@ function Products() {
         </div>
       )}
 
-      {/* Add Form (unchanged) */}
+      {/* Add Form */}
       {showAddForm && (
         <div className="bg-gray-900 border border-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
