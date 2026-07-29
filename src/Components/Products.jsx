@@ -1,13 +1,16 @@
 // src/Components/GetAllProducts.jsx
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function Products() {
+  const navigate = useNavigate();
+  
   // ---------- State ----------
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // 🔥 Track locally added products (not yet on server)
   const [localAddedProducts, setLocalAddedProducts] = useState([]);
@@ -46,6 +49,19 @@ function Products() {
   // ---------- Get user info for welcome message ----------
   const userFullName = localStorage.getItem("userFullName") || "User";
   const userFirstName = localStorage.getItem("userFirstName") || "";
+  const userProfile = JSON.parse(localStorage.getItem("userProfile") || "{}");
+
+  // ---------- Handle logout ----------
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    localStorage.removeItem("userProfile");
+    localStorage.removeItem("userFullName");
+    localStorage.removeItem("userFirstName");
+    localStorage.removeItem("userLastName");
+    navigate("/login");
+  };
 
   // ---------- Fetch categories ----------
   useEffect(() => {
@@ -334,406 +350,504 @@ function Products() {
 
   // ---------- Render ----------
   return (
-    <div className="flex flex-col min-h-full justify-start bg-gray-950 px-3 sm:px-6 pb-3 sm:pb-6 pt-0 rounded-2xl sm:rounded-3xl border border-gray-800 shadow-2xl overflow-x-hidden gap-0">
-      
-      {/* 🎉 Welcome Message Section */}
-      <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-2xl p-4 sm:p-6 mt-3 mb-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="min-h-screen bg-gray-950">
+      {/* ========== NAVBAR ========== */}
+      <nav className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-md border-b border-gray-800/80 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          
+          {/* LEFT: Hamburger Menu + Logo */}
           <div className="flex items-center gap-3">
-            <span className="text-3xl sm:text-4xl">👋</span>
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-white">
-                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                  {userFullName}
-                </span>
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-400">
-                You are successfully logged in. Manage your products below.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-green-500/20 border border-green-500/30 text-green-400 text-xs rounded-full flex items-center gap-1">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              Online
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm pt-4 pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-white tracking-tight">Products Management</h2>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 ml-auto">
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
-          >
-            + Add New
-          </button>
-
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
-          >
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat === "all" ? "All Categories" : cat}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
-          >
-            <option value="title">Sort by Title</option>
-            <option value="price">Sort by Price</option>
-            <option value="rating">Sort by Rating</option>
-          </select>
-          <button
-            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-            className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 hover:bg-gray-800 transition-colors cursor-pointer"
-          >
-            {sortOrder === "asc" ? "↑" : "↓"}
-          </button>
-
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-gray-900 border border-gray-800 text-gray-200 placeholder-gray-500 text-xs rounded-xl px-3 py-2 w-32 sm:w-44 focus:outline-none focus:border-blue-500 transition-all"
-          />
-          {searchTerm && (
+            {/* Hamburger Menu Button */}
             <button
-              onClick={() => setSearchTerm("")}
-              className="text-gray-500 hover:text-white text-xs font-semibold cursor-pointer"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden text-gray-300 hover:text-white transition p-1.5 rounded-lg hover:bg-gray-800/50"
+              aria-label="Toggle menu"
             >
-              ✕
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {isMobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
             </button>
-          )}
-        </div>
-      </div>
 
-      {/* Edit Form */}
-      {editingProduct && (
-        <div className="bg-gray-900 border border-amber-500/40 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
-            <h2 className="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider">
-              ✏️ Editing Product ID: {editingProduct.id}
-            </h2>
-            <button
-              onClick={() => setEditingProduct(null)}
-              className="text-gray-400 hover:text-white text-xs font-semibold px-2 py-1 bg-gray-950 rounded-lg border border-gray-800 cursor-pointer"
-            >
-              ✕ Cancel
-            </button>
+            {/* Logo */}
+            <Link to="/products" className="flex items-center gap-2">
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                ProductHub
+              </span>
+            </Link>
           </div>
 
-          <form onSubmit={handleUpdateSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product Title *</label>
-              <input
-                type="text"
-                value={editingProduct.title}
-                onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
-                required
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Price ($) *</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editingProduct.price}
-                onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
-                required
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Category</label>
-              <input
-                type="text"
-                value={editingProduct.category}
-                onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product URL (Image)</label>
-              <input
-                type="url"
-                value={editingProduct.thumbnail}
-                onChange={(e) => setEditingProduct({ ...editingProduct, thumbnail: e.target.value })}
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Description</label>
-              <input
-                type="text"
-                value={editingProduct.description}
-                onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setEditingProduct(null)}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isUpdating}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl text-xs transition-all shadow-md disabled:opacity-50 cursor-pointer"
-              >
-                {isUpdating ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Add Form */}
-      {showAddForm && (
-        <div className="bg-gray-900 border border-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
-            <h2 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Add New Product Form</h2>
-            <button
-              onClick={() => setShowAddForm(false)}
-              className="text-gray-400 hover:text-white text-xs font-semibold px-2 py-1 bg-gray-950 rounded-lg border border-gray-800 cursor-pointer"
-            >
-              ✕ Close
-            </button>
-          </div>
-
-          <form onSubmit={handleAddProductSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product Title *</label>
-              <input
-                type="text"
-                placeholder="e.g. BMW Pencil"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                required
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Price ($) *</label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="e.g. 10"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                required
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Category</label>
-              <input
-                type="text"
-                placeholder="e.g. stationery"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Product URL (Image)</label>
-              <input
-                type="url"
-                placeholder="https://example.com/image.jpg"
-                value={formData.thumbnail}
-                onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-medium text-gray-300 mb-1">Description</label>
-              <input
-                type="text"
-                placeholder="Product description..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md disabled:opacity-50 cursor-pointer"
-              >
-                {isSubmitting ? "Adding..." : "Save Product"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Loading / Error / Grid */}
-      {loading && (
-        <div className="flex flex-col justify-center items-center min-h-[250px] sm:min-h-[350px] space-y-3 bg-gray-900/30 border border-gray-800/40 rounded-2xl">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-medium text-gray-400 tracking-wider uppercase">Loading Products...</p>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 sm:p-8 rounded-2xl text-center my-4 shadow-xl">
-          <p className="font-semibold text-base text-red-300">Oops! Something went wrong.</p>
-          <p className="text-xs mt-1 text-gray-400">{error}</p>
-          <button
-            onClick={() => fetchProducts()}
-            className="mt-4 sm:mt-5 px-4 sm:px-5 py-2 sm:py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-all shadow-md shadow-red-600/30"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && (
-        <>
-          {products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 sm:py-20 bg-gray-900/30 border border-gray-800/60 rounded-2xl text-gray-400 space-y-3 shadow-inner">
-              <span className="text-4xl">📦</span>
-              <p className="text-sm font-medium">No products found matching your criteria.</p>
-              <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("all");
-                  setSortBy("title");
-                }}
-                className="text-xs text-blue-400 hover:text-blue-300 underline font-medium transition-colors"
-              >
-                Reset filters
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 xl:gap-6">
-                {products.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-gray-900 border border-gray-800/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl hover:border-gray-700 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
-                  >
-                    <div>
-                      <div className="relative w-full h-36 sm:h-40 md:h-44 bg-gray-950 rounded-lg sm:rounded-xl overflow-hidden border border-gray-800/50 mb-2 sm:mb-3">
-                        <img
-                          src={p.thumbnail}
-                          alt={p.title}
-                          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                        />
-                        {p.category && (
-                          <span className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-md text-gray-300 text-[8px] sm:text-[10px] font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full uppercase tracking-wider border border-gray-700/50">
-                            {p.category}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-xs sm:text-sm text-white truncate group-hover:text-blue-400 transition-colors">
-                        {p.title}
-                      </h3>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] sm:text-xs text-gray-400">Price</span>
-                        <span className="text-blue-400 font-bold text-sm sm:text-base">${p.price}</span>
-                      </div>
-                      {p.rating && (
-                        <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
-                          <span className="text-[10px] sm:text-xs text-gray-400">⭐</span>
-                          <span className="text-[10px] sm:text-xs text-gray-300">
-                            {typeof p.rating === "number" ? p.rating.toFixed(1) : p.rating}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-3 sm:mt-4 pt-3 border-t border-gray-800/80 flex items-center gap-1.5">
-                      <Link
-                        to={`/products/${p.id}`}
-                        className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-2 rounded-lg transition-all text-[10px] font-semibold border border-blue-500/30"
-                        title="View Details"
-                      >
-                        <span>👁️ View</span>
-                      </Link>
-                      <button
-                        onClick={(e) => handleEditClick(p, e)}
-                        className="px-2.5 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-gray-950 rounded-lg transition-all text-[10px] font-semibold border border-amber-500/30 cursor-pointer"
-                        title="Edit Product"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteProduct(p.id, e)}
-                        className="px-2.5 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg transition-all text-[10px] font-semibold border border-red-500/30 cursor-pointer"
-                        title="Delete Product"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+          {/* CENTER: Welcome Message (Between Hamburger & Profile) */}
+          <div className="hidden md:flex flex-1 items-center justify-center max-w-2xl mx-4">
+            <div className="bg-gradient-to-r from-blue-600/15 to-purple-600/15 border border-blue-500/20 rounded-xl px-4 py-1.5 flex items-center gap-3 w-full">
+              <span className="text-lg">👋</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
+                </p>
+                <p className="text-[10px] text-gray-400 truncate">Manage your products</p>
               </div>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                Online
+              </span>
+            </div>
+          </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-1.5 pt-4 border-t border-gray-800/80">
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl text-xs disabled:opacity-40 hover:bg-gray-800 transition-all cursor-pointer"
-                  >
-                    Prev
-                  </button>
-                  {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
-                    const page = i + 1;
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          currentPage === page
-                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-500"
-                            : "bg-gray-900 border border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-white"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl text-xs disabled:opacity-40 hover:bg-gray-800 transition-all cursor-pointer"
-                  >
-                    Next
-                  </button>
+          {/* RIGHT: Profile Section */}
+          <div className="flex items-center gap-3">
+            <div className="relative group">
+              <button className="flex items-center gap-2 bg-gray-800/50 hover:bg-gray-800 rounded-full px-3 py-1.5 transition border border-gray-700/50">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
+                  {userFirstName.charAt(0).toUpperCase() || "U"}
                 </div>
+                <span className="hidden sm:inline text-sm text-white font-medium">
+                  {userFirstName || "User"}
+                </span>
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1 z-50">
+                <div className="px-4 py-2 border-b border-gray-800">
+                  <p className="text-sm font-medium text-white">{userFullName}</p>
+                  <p className="text-xs text-gray-400 truncate">{userProfile.email || "user@example.com"}</p>
+                </div>
+                <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition">
+                  <span>👤</span> Profile
+                </Link>
+                <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition">
+                  <span>⚙️</span> Settings
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition w-full border-t border-gray-800"
+                >
+                  <span>🚪</span> Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden mt-3 pt-3 border-t border-gray-800/80 space-y-2">
+            {/* Mobile Welcome Message */}
+            <div className="bg-gradient-to-r from-blue-600/15 to-purple-600/15 border border-blue-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
+              <span className="text-base">👋</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-white truncate">
+                  Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
+                </p>
+              </div>
+              <span className="flex items-center gap-1 text-[8px] text-green-400 whitespace-nowrap">
+                <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+                Online
+              </span>
+            </div>
+
+            {/* Mobile Navigation Links */}
+            <Link to="/products" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/50 rounded-lg transition">
+              <span>📦</span> Products
+            </Link>
+            <Link to="/profile" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/50 rounded-lg transition">
+              <span>👤</span> Profile
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition w-full"
+            >
+              <span>🚪</span> Logout
+            </button>
+          </div>
+        )}
+      </nav>
+
+      {/* ========== MAIN CONTENT ========== */}
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex flex-col min-h-full justify-start bg-gray-950 px-3 sm:px-6 pb-3 sm:pb-6 pt-0 rounded-2xl sm:rounded-3xl border border-gray-800 shadow-2xl overflow-x-hidden gap-0">
+          
+          {/* Header with Products Management and Controls */}
+          <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm pt-4 pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-white tracking-tight">Products Management</h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                + Add New
+              </button>
+
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat === "all" ? "All Categories" : cat}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                <option value="title">Sort by Title</option>
+                <option value="price">Sort by Price</option>
+                <option value="rating">Sort by Rating</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                className="bg-gray-900 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2 hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </button>
+
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-gray-900 border border-gray-800 text-gray-200 placeholder-gray-500 text-xs rounded-xl px-3 py-2 w-32 sm:w-44 focus:outline-none focus:border-blue-500 transition-all"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="text-gray-500 hover:text-white text-xs font-semibold cursor-pointer"
+                >
+                  ✕
+                </button>
               )}
             </div>
+          </div>
+
+          {/* Edit Form */}
+          {editingProduct && (
+            <div className="bg-gray-900 border border-amber-500/40 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
+                <h2 className="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider">
+                  ✏️ Editing Product ID: {editingProduct.id}
+                </h2>
+                <button
+                  onClick={() => setEditingProduct(null)}
+                  className="text-gray-400 hover:text-white text-xs font-semibold px-2 py-1 bg-gray-950 rounded-lg border border-gray-800 cursor-pointer"
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Product Title *</label>
+                  <input
+                    type="text"
+                    value={editingProduct.title}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
+                    required
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Price ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingProduct.price}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
+                    required
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Category</label>
+                  <input
+                    type="text"
+                    value={editingProduct.category}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Product URL (Image)</label>
+                  <input
+                    type="url"
+                    value={editingProduct.thumbnail}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, thumbnail: e.target.value })}
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={editingProduct.description}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdating}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl text-xs transition-all shadow-md disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUpdating ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
           )}
-        </>
-      )}
+
+          {/* Add Form */}
+          {showAddForm && (
+            <div className="bg-gray-900 border border-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
+                <h2 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Add New Product Form</h2>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="text-gray-400 hover:text-white text-xs font-semibold px-2 py-1 bg-gray-950 rounded-lg border border-gray-800 cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={handleAddProductSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Product Title *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. BMW Pencil"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Price ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 10"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    required
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Category</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. stationery"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Product URL (Image)</label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/image.jpg"
+                    value={formData.thumbnail}
+                    onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-gray-300 mb-1">Description</label>
+                  <input
+                    type="text"
+                    placeholder="Product description..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full bg-gray-950 border border-gray-800 text-gray-200 placeholder-gray-600 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmitting ? "Adding..." : "Save Product"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Loading / Error / Grid */}
+          {loading && (
+            <div className="flex flex-col justify-center items-center min-h-[250px] sm:min-h-[350px] space-y-3 bg-gray-900/30 border border-gray-800/40 rounded-2xl">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs font-medium text-gray-400 tracking-wider uppercase">Loading Products...</p>
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 sm:p-8 rounded-2xl text-center my-4 shadow-xl">
+              <p className="font-semibold text-base text-red-300">Oops! Something went wrong.</p>
+              <p className="text-xs mt-1 text-gray-400">{error}</p>
+              <button
+                onClick={() => fetchProducts()}
+                className="mt-4 sm:mt-5 px-4 sm:px-5 py-2 sm:py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-all shadow-md shadow-red-600/30"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {products.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 sm:py-20 bg-gray-900/30 border border-gray-800/60 rounded-2xl text-gray-400 space-y-3 shadow-inner">
+                  <span className="text-4xl">📦</span>
+                  <p className="text-sm font-medium">No products found matching your criteria.</p>
+                  <button
+                    onClick={() => {
+                      setSearchTerm("");
+                      setSelectedCategory("all");
+                      setSortBy("title");
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 underline font-medium transition-colors"
+                  >
+                    Reset filters
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 xl:gap-6">
+                    {products.map((p) => (
+                      <div
+                        key={p.id}
+                        className="bg-gray-900 border border-gray-800/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl hover:border-gray-700 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
+                      >
+                        <div>
+                          <div className="relative w-full h-36 sm:h-40 md:h-44 bg-gray-950 rounded-lg sm:rounded-xl overflow-hidden border border-gray-800/50 mb-2 sm:mb-3">
+                            <img
+                              src={p.thumbnail}
+                              alt={p.title}
+                              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                            />
+                            {p.category && (
+                              <span className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-md text-gray-300 text-[8px] sm:text-[10px] font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full uppercase tracking-wider border border-gray-700/50">
+                                {p.category}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="font-semibold text-xs sm:text-sm text-white truncate group-hover:text-blue-400 transition-colors">
+                            {p.title}
+                          </h3>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] sm:text-xs text-gray-400">Price</span>
+                            <span className="text-blue-400 font-bold text-sm sm:text-base">${p.price}</span>
+                          </div>
+                          {p.rating && (
+                            <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
+                              <span className="text-[10px] sm:text-xs text-gray-400">⭐</span>
+                              <span className="text-[10px] sm:text-xs text-gray-300">
+                                {typeof p.rating === "number" ? p.rating.toFixed(1) : p.rating}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3 sm:mt-4 pt-3 border-t border-gray-800/80 flex items-center gap-1.5">
+                          <Link
+                            to={`/products/${p.id}`}
+                            className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-2 rounded-lg transition-all text-[10px] font-semibold border border-blue-500/30"
+                            title="View Details"
+                          >
+                            <span>👁️ View</span>
+                          </Link>
+                          <button
+                            onClick={(e) => handleEditClick(p, e)}
+                            className="px-2.5 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-gray-950 rounded-lg transition-all text-[10px] font-semibold border border-amber-500/30 cursor-pointer"
+                            title="Edit Product"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteProduct(p.id, e)}
+                            className="px-2.5 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg transition-all text-[10px] font-semibold border border-red-500/30 cursor-pointer"
+                            title="Delete Product"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1.5 pt-4 border-t border-gray-800/80">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl text-xs disabled:opacity-40 hover:bg-gray-800 transition-all cursor-pointer"
+                      >
+                        Prev
+                      </button>
+                      {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
+                        const page = i + 1;
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-8 h-8 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                              currentPage === page
+                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-500"
+                                : "bg-gray-900 border border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-white"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl text-xs disabled:opacity-40 hover:bg-gray-800 transition-all cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
