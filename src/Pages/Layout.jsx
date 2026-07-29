@@ -6,6 +6,7 @@ function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileDropdownOpen, setIsMobileDropdownOpen] = useState(false); // 🆕 mobile dropdown
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [user, setUser] = useState(null);
 
@@ -21,6 +22,7 @@ function Layout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setIsDropdownOpen(false);
+    setIsMobileDropdownOpen(false);
     navigate("/login");
   };
 
@@ -38,7 +40,7 @@ function Layout() {
   return (
     <div className="flex flex-col md:flex-row w-full min-h-screen bg-[#0b0b12] font-sans overflow-x-hidden text-slate-100">
       
-      {/* ===== MOBILE HEADER (visible only on small screens) ===== */}
+      {/* ===== MOBILE HEADER ===== */}
       <div className="md:hidden flex items-center justify-between bg-[#0b0b12] border-b border-white/5 px-4 py-3.5 w-full shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-xl shadow-lg shadow-blue-500/20 ring-1 ring-white/10">
@@ -50,17 +52,48 @@ function Layout() {
             Admin Portal
           </h1>
         </div>
+
         <div className="flex items-center gap-2">
-          {/* 🆕 Mobile Logout Button */}
-          <button
-            onClick={handleLogout}
-            className="p-2 text-slate-300 hover:text-white focus:outline-none bg-white/5 rounded-xl border border-white/5 cursor-pointer"
-            aria-label="Logout"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
+          {/* 🆕 Mobile Avatar with Dropdown (like desktop) */}
+          <div className="relative">
+            <button
+              onClick={() => setIsMobileDropdownOpen(!isMobileDropdownOpen)}
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-semibold text-sm ring-2 ring-white/10 hover:ring-blue-400 transition-all cursor-pointer focus:outline-none"
+            >
+              {user ? user.firstName?.charAt(0) || "A" : "A"}
+            </button>
+
+            {isMobileDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsMobileDropdownOpen(false)} />
+                <div className="absolute right-0 mt-2 w-56 bg-[#1a1a2e] rounded-xl shadow-2xl border border-white/10 z-50 py-1 overflow-hidden">
+                  {user ? (
+                    <div className="px-4 py-3 border-b border-white/5">
+                      <p className="text-sm font-medium text-white">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                      <p className="text-xs text-blue-400 mt-1">Admin</p>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-3 border-b border-white/5">
+                      <p className="text-sm font-medium text-white">Admin</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Hamburger Menu */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
