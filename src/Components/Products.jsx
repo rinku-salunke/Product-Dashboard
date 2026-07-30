@@ -14,6 +14,9 @@ function Products() {
   // 🔥 Track deleted product IDs
   const [deletedProductIds, setDeletedProductIds] = useState([]);
 
+  // ---------- NEW: Wishlist state ----------
+  const [wishlistIds, setWishlistIds] = useState([]);
+
   // Pagination (server-side for main, client-side for search)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
@@ -42,6 +45,42 @@ function Products() {
 
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // ---------- Load wishlist from localStorage ----------
+  useEffect(() => {
+    const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
+    setWishlistIds(wishlist.map(item => item.id));
+  }, []);
+
+  // ---------- Wishlist functions ----------
+  const toggleWishlist = (product, e) => {
+    e.stopPropagation();
+
+    const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
+    const exists = wishlist.some(item => item.id === product.id);
+    
+    let updatedWishlist;
+    if (exists) {
+      // Remove from wishlist
+      updatedWishlist = wishlist.filter(item => item.id !== product.id);
+      setWishlistIds(prev => prev.filter(id => id !== product.id));
+    } else {
+      // Add to wishlist
+      updatedWishlist = [...wishlist, {
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        thumbnail: product.thumbnail,
+        rating: product.rating,
+        category: product.category,
+      }];
+      setWishlistIds(prev => [...prev, product.id]);
+    }
+    
+    localStorage.setItem("wishlist", JSON.stringify(updatedWishlist));
+    // Dispatch event to update badge count in Layout
+    window.dispatchEvent(new Event("wishlistUpdated"));
+  };
 
   // ---------- Fetch categories ----------
   useEffect(() => {
@@ -121,9 +160,7 @@ function Products() {
       }
 
       // ---- CASE 2: Search – fetch all matching from API, merge with local, client-side pagination ----
-      // Fetch all matching products from API (use a large limit)
       let searchUrl = `https://dummyjson.com/products/search?q=${encodeURIComponent(trimmedSearch)}&limit=100&select=id,title,price,thumbnail,category,rating,stock`;
-      // Add sorting if needed (API supports sortBy/order)
       searchUrl += `&sortBy=${sortBy}&order=${sortOrder}`;
 
       const res = await fetch(searchUrl);
@@ -131,16 +168,13 @@ function Products() {
       const data = await res.json();
 
       let apiProducts = data.products || [];
-      // Filter out deleted products
       apiProducts = filterDeleted(apiProducts);
 
-      // Filter local added products by search term
       const localMatches = localAddedProducts.filter((p) =>
         p.title?.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
         p.category?.toLowerCase().includes(trimmedSearch.toLowerCase())
       );
 
-      // Merge: API products first, then local products not already in API
       const apiIds = new Set(apiProducts.map((p) => p.id));
       const merged = [...apiProducts];
       for (const localProduct of localMatches) {
@@ -149,16 +183,14 @@ function Products() {
         }
       }
 
-      // Sort merged list (client-side) because API sorting may not be consistent with merged data
       const sorted = sortProducts(merged);
 
-      // Apply client-side pagination
       const start = (currentPage - 1) * itemsPerPage;
       const end = start + itemsPerPage;
       const paginated = sorted.slice(start, end);
 
       setProducts(paginated);
-      setTotal(sorted.length); // total is the full merged list length
+      setTotal(sorted.length);
 
     } catch (err) {
       setError(err.message || "Failed to fetch products");
@@ -215,13 +247,10 @@ function Products() {
       const newProduct = await res.json();
       console.log("Added successfully:", newProduct);
 
-      // Add to local added products
       setLocalAddedProducts((prev) => [newProduct, ...prev]);
-      // Also add to current list (if not searching, we'll show it immediately)
       setProducts((prev) => [newProduct, ...prev]);
       setTotal((prev) => prev + 1);
 
-      // Reset form
       setFormData({
         title: "",
         price: "",
@@ -244,17 +273,14 @@ function Products() {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
 
     try {
-      // Check if product is local (not on server)
       const isLocal = localAddedProducts.some((p) => p.id === id);
       if (isLocal) {
-        // Remove from local list
         setLocalAddedProducts((prev) => prev.filter((p) => p.id !== id));
         setProducts((prev) => prev.filter((p) => p.id !== id));
         setTotal((prev) => Math.max(prev - 1, 0));
         return;
       }
 
-      // Server product: call DELETE
       const res = await fetch(`https://dummyjson.com/products/${id}`, {
         method: "DELETE",
       });
@@ -262,7 +288,6 @@ function Products() {
       const data = await res.json();
       console.log("Deleted successfully:", data);
 
-      // Mark as deleted locally
       setDeletedProductIds((prev) => [...prev, id]);
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setTotal((prev) => Math.max(prev - 1, 0));
@@ -297,10 +322,8 @@ function Products() {
     try {
       setIsUpdating(true);
 
-      // Check if product is local (not on server)
       const isLocal = localAddedProducts.some((p) => p.id === editingProduct.id);
       if (isLocal) {
-        // Update locally
         const updated = { ...editingProduct };
         setLocalAddedProducts((prev) =>
           prev.map((p) => (p.id === updated.id ? updated : p))
@@ -314,7 +337,6 @@ function Products() {
         return;
       }
 
-      // Server product: call PUT
       const res = await fetch(
         `https://dummyjson.com/products/${editingProduct.id}`,
         {
@@ -333,7 +355,6 @@ function Products() {
       const updatedData = await res.json();
       console.log("Updated successfully:", updatedData);
 
-      // Update in main list
       setProducts((prev) =>
         prev.map((p) => (p.id === updatedData.id ? updatedData : p))
       );
@@ -350,7 +371,7 @@ function Products() {
   // ---------- Render ----------
   return (
     <div className="flex flex-col min-h-full justify-start bg-gray-950 px-3 sm:px-6 pb-3 sm:pb-6 pt-0 rounded-2xl sm:rounded-3xl border border-gray-800 shadow-2xl overflow-x-hidden gap-0">
-      {/* Header (unchanged) */}
+      {/* Header */}
       <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur-sm pt-4 pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-white tracking-tight">Products Management</h2>
@@ -410,7 +431,7 @@ function Products() {
         </div>
       </div>
 
-      {/* Edit Form (unchanged) */}
+      {/* Edit Form */}
       {editingProduct && (
         <div className="bg-gray-900 border border-amber-500/40 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
@@ -494,7 +515,7 @@ function Products() {
         </div>
       )}
 
-      {/* Add Form (unchanged) */}
+      {/* Add Form */}
       {showAddForm && (
         <div className="bg-gray-900 border border-gray-800 p-4 sm:p-6 rounded-2xl shadow-xl my-3">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
@@ -622,66 +643,94 @@ function Products() {
           ) : (
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 xl:gap-6">
-                {products.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-gray-900 border border-gray-800/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl hover:border-gray-700 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
-                  >
-                    <div>
-                      <div className="relative w-full h-36 sm:h-40 md:h-44 bg-gray-950 rounded-lg sm:rounded-xl overflow-hidden border border-gray-800/50 mb-2 sm:mb-3">
-                        <img
-                          src={p.thumbnail}
-                          alt={p.title}
-                          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                        />
-                        {p.category && (
-                          <span className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-md text-gray-300 text-[8px] sm:text-[10px] font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full uppercase tracking-wider border border-gray-700/50">
-                            {p.category}
-                          </span>
+                {products.map((p) => {
+                  const isInWishlist = wishlistIds.includes(p.id);
+                  return (
+                    <div
+                      key={p.id}
+                      className="bg-gray-900 border border-gray-800/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl hover:border-gray-700 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
+                    >
+                      <div>
+                        <div className="relative w-full h-36 sm:h-40 md:h-44 bg-gray-950 rounded-lg sm:rounded-xl overflow-hidden border border-gray-800/50 mb-2 sm:mb-3">
+                          <img
+                            src={p.thumbnail}
+                            alt={p.title}
+                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                          />
+                          {p.category && (
+                            <span className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-md text-gray-300 text-[8px] sm:text-[10px] font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full uppercase tracking-wider border border-gray-700/50">
+                              {p.category}
+                            </span>
+                          )}
+                          
+                          {/* ---------- RED HEART WISHLIST BUTTON ---------- */}
+                          <button
+                            onClick={(e) => toggleWishlist(p, e)}
+                            className={`absolute top-2 left-2 p-1.5 sm:p-2 rounded-full transition-all duration-300 ${
+                              isInWishlist
+                                ? "bg-red-500/80 text-white scale-110"
+                                : "bg-black/50 text-gray-300 hover:bg-red-500/50 hover:text-white hover:scale-110"
+                            }`}
+                            title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                          >
+                            <svg 
+                              className="w-4 h-4 sm:w-5 sm:h-5" 
+                              fill={isInWishlist ? "currentColor" : "none"} 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth="2" 
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                        <h3 className="font-semibold text-xs sm:text-sm text-white truncate group-hover:text-blue-400 transition-colors">
+                          {p.title}
+                        </h3>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[10px] sm:text-xs text-gray-400">Price</span>
+                          <span className="text-blue-400 font-bold text-sm sm:text-base">${p.price}</span>
+                        </div>
+                        {p.rating && (
+                          <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
+                            <span className="text-[10px] sm:text-xs text-gray-400">⭐</span>
+                            <span className="text-[10px] sm:text-xs text-gray-300">
+                              {typeof p.rating === "number" ? p.rating.toFixed(1) : p.rating}
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <h3 className="font-semibold text-xs sm:text-sm text-white truncate group-hover:text-blue-400 transition-colors">
-                        {p.title}
-                      </h3>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] sm:text-xs text-gray-400">Price</span>
-                        <span className="text-blue-400 font-bold text-sm sm:text-base">${p.price}</span>
-                      </div>
-                      {p.rating && (
-                        <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
-                          <span className="text-[10px] sm:text-xs text-gray-400">⭐</span>
-                          <span className="text-[10px] sm:text-xs text-gray-300">
-                            {typeof p.rating === "number" ? p.rating.toFixed(1) : p.rating}
-                          </span>
-                        </div>
-                      )}
-                    </div>
 
-                    <div className="mt-3 sm:mt-4 pt-3 border-t border-gray-800/80 flex items-center gap-1.5">
-                      <Link
-                        to={`/products/${p.id}`}
-                        className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-2 rounded-lg transition-all text-[10px] font-semibold border border-blue-500/30"
-                        title="View Details"
-                      >
-                        <span>👁️ View</span>
-                      </Link>
-                      <button
-                        onClick={(e) => handleEditClick(p, e)}
-                        className="px-2.5 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-gray-950 rounded-lg transition-all text-[10px] font-semibold border border-amber-500/30 cursor-pointer"
-                        title="Edit Product"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteProduct(p.id, e)}
-                        className="px-2.5 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg transition-all text-[10px] font-semibold border border-red-500/30 cursor-pointer"
-                        title="Delete Product"
-                      >
-                        🗑️
-                      </button>
+                      <div className="mt-3 sm:mt-4 pt-3 border-t border-gray-800/80 flex items-center gap-1.5">
+                        <Link
+                          to={`/products/${p.id}`}
+                          className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-2 rounded-lg transition-all text-[10px] font-semibold border border-blue-500/30"
+                          title="View Details"
+                        >
+                          <span>👁️ View</span>
+                        </Link>
+                        <button
+                          onClick={(e) => handleEditClick(p, e)}
+                          className="px-2.5 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-gray-950 rounded-lg transition-all text-[10px] font-semibold border border-amber-500/30 cursor-pointer"
+                          title="Edit Product"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteProduct(p.id, e)}
+                          className="px-2.5 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg transition-all text-[10px] font-semibold border border-red-500/30 cursor-pointer"
+                          title="Delete Product"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Pagination */}

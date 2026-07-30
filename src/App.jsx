@@ -7,6 +7,7 @@ import Login from "./Auth/Login";
 import Users from "./Components/Users";
 import Carts from "./Components/Carts";
 import ProtectedRoute from "./Auth/ProtectedRoute";
+import Wishlist from "./Components/Wishlist";
 
 function App() {
   return (
@@ -27,8 +28,9 @@ function App() {
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="users" element={<Users />} />
           <Route path="carts" element={<Carts />} />
+          <Route path="wishlist" element={<Wishlist/>}></Route>
         </Route>
-
+         
         {/* Catch-all - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

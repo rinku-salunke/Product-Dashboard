@@ -8,6 +8,9 @@ function Layout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
+  
+  // ---------- NEW: Wishlist state ----------
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   // Get user full name for welcome message
   const userFullName = localStorage.getItem("userFullName") || "User";
@@ -18,6 +21,21 @@ function Layout() {
     if (userData) {
       setUser(JSON.parse(userData));
     }
+    
+    // ---------- NEW: Load wishlist count from localStorage ----------
+    const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
+    setWishlistCount(wishlist.length);
+  }, []);
+
+  // ---------- NEW: Listen for wishlist updates ----------
+  useEffect(() => {
+    const handleWishlistUpdate = () => {
+      const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
+      setWishlistCount(wishlist.length);
+    };
+
+    window.addEventListener("wishlistUpdated", handleWishlistUpdate);
+    return () => window.removeEventListener("wishlistUpdated", handleWishlistUpdate);
   }, []);
 
   const handleLogout = () => {
@@ -127,6 +145,27 @@ function Layout() {
               </svg>
               {!isSidebarCollapsed && <span>Carts</span>}
             </Link>
+
+            {/* ---------- NEW: Wishlist Link in Sidebar ---------- */}
+            <Link
+              to="/wishlist"
+              className={navLinkClass("/wishlist")}
+              onClick={() => setIsMobileOpen(false)}
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              {!isSidebarCollapsed && (
+                <span className="flex items-center gap-2">
+                  Wishlist
+                  {wishlistCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </span>
+              )}
+            </Link>
           </div>
         </nav>
 
@@ -173,7 +212,7 @@ function Layout() {
             </svg>
           </button>
 
-          {/* CENTER: Welcome Message - No background rectangle */}
+          {/* CENTER: Welcome Message */}
           <div className="flex-1 flex items-center justify-center px-2 sm:px-4 min-w-0">
             <div className="flex items-center gap-2 sm:gap-3 max-w-full">
               <span className="text-sm sm:text-base shrink-0">👋</span>
@@ -183,8 +222,26 @@ function Layout() {
             </div>
           </div>
 
-          {/* RIGHT: Avatar & dropdown */}
+          {/* RIGHT: Wishlist + Avatar & dropdown */}
           <div className="flex items-center gap-2 sm:gap-4 ml-auto shrink-0">
+            
+            {/* ---------- NEW: Wishlist Icon in Header ---------- */}
+            <Link
+              to="/wishlist"
+              className="relative text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+              aria-label="Wishlist"
+            >
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Avatar & dropdown */}
             <div className="relative">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -206,9 +263,24 @@ function Layout() {
                       </p>
                       <p className="text-xs text-blue-400 mt-1">Admin</p>
                     </div>
+                    <Link
+                      to="/wishlist"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 transition-colors duration-150"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span>Wishlist</span>
+                      {wishlistCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                          {wishlistCount}
+                        </span>
+                      )}
+                    </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150 cursor-pointer"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150 cursor-pointer border-t border-white/5"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
