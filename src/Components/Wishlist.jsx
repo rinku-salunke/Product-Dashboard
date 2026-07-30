@@ -5,10 +5,12 @@ function Wishlist() {
   const navigate = useNavigate();
   const [wishlistItems, setWishlistItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cartLoading, setCartLoading] = useState({}); // Track loading per product
   
   // Check if user is logged in
   const isLoggedIn = localStorage.getItem("token") !== null;
   const userFullName = localStorage.getItem("userFullName") || "";
+  const userId = localStorage.getItem("userId") || "1"; // Default user ID if not set
 
   // Load wishlist from localStorage
   useEffect(() => {
@@ -25,9 +27,110 @@ function Wishlist() {
     window.dispatchEvent(new Event("wishlistUpdated"));
   };
 
-  // Add to cart
-  const addToCart = (product) => {
-    alert(`🛒 Added "${product.title}" to cart!`);
+  // Add to cart and remove from wishlist
+  const addToCart = async (product) => {
+    // Set loading state for this specific product
+    setCartLoading(prev => ({ ...prev, [product.id]: true }));
+    
+    try {
+      const payload = {
+        userId: parseInt(userId),
+        products: [
+          {
+            id: product.id,
+            quantity: 1
+          }
+        ]
+      };
+
+      const response = await fetch("https://dummyjson.com/carts/add", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      await response.json();
+      
+      // Success message
+      alert(`✅ "${product.title}" added to cart successfully!`);
+      
+      // REMOVE ITEM FROM WISHLIST AFTER ADDING TO CART
+      removeFromWishlist(product.id);
+      
+      // Trigger a custom event to notify Carts component to refresh
+      window.dispatchEvent(new Event("cartUpdated"));
+      
+      // Optional: Store cart items in localStorage as backup
+      const existingCart = JSON.parse(localStorage.getItem("myCart") || "[]");
+      const existingItem = existingCart.find(item => item.id === product.id);
+      
+      let updatedCart;
+      if (existingItem) {
+        updatedCart = existingCart.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: (item.quantity || 1) + 1 }
+            : item
+        );
+      } else {
+        updatedCart = [...existingCart, { ...product, quantity: 1 }];
+      }
+      localStorage.setItem("myCart", JSON.stringify(updatedCart));
+
+    } catch (error) {
+      console.error("Add to cart error:", error);
+      alert(`❌ Failed to add "${product.title}" to cart: ${error.message}`);
+    } finally {
+      // Clear loading state
+      setCartLoading(prev => ({ ...prev, [product.id]: false }));
+    }
+  };
+
+  // Alternative: Add to cart with quantity selection and remove from wishlist
+  const addToCartWithQuantity = async (product, quantity = 1) => {
+    setCartLoading(prev => ({ ...prev, [product.id]: true }));
+    
+    try {
+      const payload = {
+        userId: parseInt(userId),
+        products: [
+          {
+            id: product.id,
+            quantity: quantity
+          }
+        ]
+      };
+
+      const response = await fetch("https://dummyjson.com/carts/add", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      await response.json();
+      alert(`✅ Added ${quantity} "${product.title}" to cart!`);
+      
+      // REMOVE ITEM FROM WISHLIST AFTER ADDING TO CART
+      removeFromWishlist(product.id);
+      
+      window.dispatchEvent(new Event("cartUpdated"));
+
+    } catch (error) {
+      alert(`❌ Failed to add to cart: ${error.message}`);
+    } finally {
+      setCartLoading(prev => ({ ...prev, [product.id]: false }));
+    }
   };
 
   if (loading) {
@@ -127,78 +230,116 @@ function Wishlist() {
       {/* Wishlist Items Grid */}
       {wishlistItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 sm:py-20 bg-[#12121c] border border-white/5 rounded-2xl">
+          <div className="text-6xl mb-4">🎉</div>
           <p className="text-gray-400 text-lg font-medium">Your wishlist is empty</p>
-          <p className="text-gray-500 text-sm mt-1">Start adding products you love!</p>
+          <p className="text-gray-500 text-sm mt-1">All items have been moved to your cart!</p>
           <Link
             to="/products"
             className="mt-6 px-6 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-medium transition shadow-lg shadow-pink-600/30"
           >
-            Browse Products →
+            Browse More Products →
           </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {wishlistItems.map((product) => (
-            <div
-              key={product.id}
-              className="bg-[#12121c] border border-white/5 rounded-xl p-4 shadow-xl hover:border-pink-500/30 transition-all duration-300 group"
-            >
-              {/* Product Image */}
-              <div className="relative w-full h-48 bg-[#0b0b12] rounded-lg overflow-hidden border border-white/5 mb-3">
-                <img
-                  src={product.thumbnail}
-                  alt={product.title}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                />
-                <button
-                  onClick={() => removeFromWishlist(product.id)}
-                  className="absolute top-2 right-2 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded-full transition border border-red-500/30"
-                  title="Remove from wishlist"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                </button>
-                <span className="absolute bottom-2 left-2 bg-pink-500/80 text-white text-[8px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
-                  ❤️ Wishlist
-                </span>
-              </div>
+          {wishlistItems.map((product) => {
+            const isAddingToCart = cartLoading[product.id] || false;
+            
+            return (
+              <div
+                key={product.id}
+                className="bg-[#12121c] border border-white/5 rounded-xl p-4 shadow-xl hover:border-pink-500/30 transition-all duration-300 group"
+              >
+                {/* Product Image */}
+                <div className="relative w-full h-48 bg-[#0b0b12] rounded-lg overflow-hidden border border-white/5 mb-3">
+                  <img
+                    src={product.thumbnail}
+                    alt={product.title}
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <button
+                    onClick={() => removeFromWishlist(product.id)}
+                    className="absolute top-2 right-2 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded-full transition border border-red-500/30"
+                    title="Remove from wishlist"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </button>
+                  <span className="absolute bottom-2 left-2 bg-pink-500/80 text-white text-[8px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                  Wishlist
+                  </span>
+                </div>
 
-              {/* Product Info */}
-              <h3 className="font-semibold text-sm text-white truncate group-hover:text-pink-400 transition-colors">
-                {product.title}
-              </h3>
-              
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-pink-400 font-bold text-lg">${product.price}</span>
-                {product.rating && (
-                  <span className="text-gray-400 text-sm">⭐ {product.rating}</span>
+                {/* Product Info */}
+                <h3 className="font-semibold text-sm text-white truncate group-hover:text-pink-400 transition-colors">
+                  {product.title}
+                </h3>
+                
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-pink-400 font-bold text-lg">${product.price}</span>
+                  {product.rating && (
+                    <span className="text-gray-400 text-sm">⭐ {product.rating}</span>
+                  )}
+                </div>
+
+                {product.category && (
+                  <span className="inline-block mt-2 px-2 py-0.5 bg-pink-600/20 text-pink-400 text-[10px] font-semibold rounded-full border border-pink-500/20">
+                    {product.category}
+                  </span>
                 )}
-              </div>
 
-              {product.category && (
-                <span className="inline-block mt-2 px-2 py-0.5 bg-pink-600/20 text-pink-400 text-[10px] font-semibold rounded-full border border-pink-500/20">
-                  {product.category}
-                </span>
-              )}
+                {/* Action Buttons */}
+                <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2">
+                  <Link
+                    to={`/products/${product.id}`}
+                    className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-1.5 rounded-lg transition-all text-xs font-semibold border border-blue-500/30"
+                  >
+                    👁️ View
+                  </Link>
+                  <button
+                    onClick={() => addToCart(product)}
+                    disabled={isAddingToCart}
+                    className="flex-1 flex items-center justify-center gap-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white py-1.5 rounded-lg transition-all text-xs font-semibold border border-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAddingToCart ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        🛒 Add to Cart
+                      </>
+                    )}
+                  </button>
+                </div>
 
-              {/* Action Buttons */}
-              <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2">
-                <Link
-                  to={`/products/${product.id}`}
-                  className="flex-1 flex items-center justify-center gap-1 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white py-1.5 rounded-lg transition-all text-xs font-semibold border border-blue-500/30"
-                >
-                  👁️ View
-                </Link>
-                <button
-                  onClick={() => addToCart(product)}
-                  className="flex-1 flex items-center justify-center gap-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white py-1.5 rounded-lg transition-all text-xs font-semibold border border-emerald-500/30"
-                >
-                  🛒 Add to Cart
-                </button>
+                {/* Quantity selector */}
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    defaultValue="1"
+                    id={`qty-${product.id}`}
+                    className="w-12 bg-gray-800 border border-gray-700 rounded text-white text-xs px-1 py-0.5"
+                  />
+                  <button
+                    onClick={() => {
+                      const qtyInput = document.getElementById(`qty-${product.id}`);
+                      const qty = parseInt(qtyInput.value) || 1;
+                      addToCartWithQuantity(product, qty);
+                    }}
+                    disabled={isAddingToCart}
+                    className="text-[10px] bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white px-2 py-0.5 rounded transition border border-purple-500/30 disabled:opacity-50"
+                  >
+                    Add Qty
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

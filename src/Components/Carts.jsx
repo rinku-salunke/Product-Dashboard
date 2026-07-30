@@ -41,6 +41,9 @@ const Carts = () => {
   const [selectedCart, setSelectedCart] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // ---------- NEW: Place Order state ----------
+  const [placingOrder, setPlacingOrder] = useState({}); // Track which cart is being processed
+
   // ---------- Helper: filter out deleted carts ----------
   const filterDeleted = (cartList) => {
     return cartList.filter((cart) => !deletedCartIds.includes(cart.id));
@@ -76,6 +79,20 @@ const Carts = () => {
     fetchCarts();
     return () => abortControllerRef.current?.abort();
   }, []);
+
+  // ---------- NEW: Listen for cart updates from Wishlist ----------
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      // Refresh the cart list when items are added from Wishlist
+      fetchCarts();
+    };
+    
+    // Add event listener
+    window.addEventListener("cartUpdated", handleCartUpdate);
+    
+    // Cleanup event listener on component unmount
+    return () => window.removeEventListener("cartUpdated", handleCartUpdate);
+  }, []); // Empty dependency array means this runs once on mount
 
   // ---------- Fetch carts by user ----------
   const fetchCartsByUser = async (userId) => {
@@ -253,6 +270,98 @@ const Carts = () => {
     }
   };
 
+  // ---------- NEW: Place Order function ----------
+  const handlePlaceOrder = async (cartId) => {
+    // Set loading state for this specific cart
+    setPlacingOrder(prev => ({ ...prev, [cartId]: true }));
+    
+    try {
+      // Find the cart
+      const cart = carts.find(c => c.id === cartId);
+      if (!cart) {
+        throw new Error("Cart not found");
+      }
+
+      // Check if cart has products
+      if (!cart.products || cart.products.length === 0) {
+        throw new Error("Cart is empty. Add products before placing order.");
+      }
+
+      // Calculate total amount
+      const totalAmount = cart.total || cart.products.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      
+      // Show order confirmation
+      const confirmOrder = window.confirm(
+        `📦 Order Summary:\n\n` +
+        `Cart #${cartId}\n` +
+        `User ID: ${cart.userId}\n` +
+        `Total Products: ${cart.totalProducts || cart.products.length}\n` +
+        `Total Quantity: ${cart.totalQuantity || cart.products.reduce((sum, p) => sum + p.quantity, 0)}\n` +
+        `Total Amount: $${totalAmount.toFixed(2)}\n\n` +
+        `Do you want to place this order?`
+      );
+
+      if (!confirmOrder) {
+        setPlacingOrder(prev => ({ ...prev, [cartId]: false }));
+        return;
+      }
+
+      // Simulate API call to place order
+      // In a real app, you would call your order API endpoint
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+
+      // Create order object (for demo purposes)
+      const orderData = {
+        cartId: cartId,
+        userId: cart.userId,
+        products: cart.products,
+        total: totalAmount,
+        orderDate: new Date().toISOString(),
+        status: "Placed",
+        orderId: `ORD-${Date.now()}-${cartId}`
+      };
+
+      // Store order in localStorage (for demo)
+      const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]");
+      localStorage.setItem("orders", JSON.stringify([orderData, ...existingOrders]));
+
+      // Success message
+      alert(`✅ Order placed successfully!\nOrder ID: ${orderData.orderId}\nTotal: $${totalAmount.toFixed(2)}`);
+
+      // Delete the cart after placing order
+      await handleDeleteCartAfterOrder(cartId);
+
+      // Refresh cart list
+      await fetchCarts();
+
+    } catch (error) {
+      alert(`❌ Failed to place order: ${error.message}`);
+      console.error("Place order error:", error);
+    } finally {
+      setPlacingOrder(prev => ({ ...prev, [cartId]: false }));
+    }
+  };
+
+  // ---------- NEW: Delete cart after order placement ----------
+  const handleDeleteCartAfterOrder = async (cartId) => {
+    try {
+      const response = await fetch(`https://dummyjson.com/carts/${cartId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      await response.json();
+
+      // Add to deleted IDs so future fetches filter it out
+      setDeletedCartIds((prev) => [...prev, cartId]);
+      // Remove from current list
+      setCarts((prev) => prev.filter((c) => c.id !== cartId));
+      if (expandedCartId === cartId) setExpandedCartId(null);
+    } catch (err) {
+      console.error("Failed to delete cart after order:", err);
+      // Don't throw error here to prevent breaking the order flow
+    }
+  };
+
   // ---------- Helpers for form fields (add/edit) ----------
   const handleAddFormChange = (e) => {
     const { name, value } = e.target;
@@ -414,6 +523,8 @@ const Carts = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {currentCarts.map((cart) => {
               const isExpanded = expandedCartId === cart.id;
+              const isPlacingOrder = placingOrder[cart.id] || false;
+              
               return (
                 <div
                   key={cart.id}
@@ -478,6 +589,40 @@ const Carts = () => {
                         Delete
                       </button>
                     </div>
+                  </div>
+
+                  {/* ---------- NEW: Place Order Button ---------- */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => handlePlaceOrder(cart.id)}
+                      disabled={isPlacingOrder || !cart.products || cart.products.length === 0}
+                      className={`w-full py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${
+                        isPlacingOrder || !cart.products || cart.products.length === 0
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30 hover:shadow-green-600/40"
+                      }`}
+                    >
+                      {isPlacingOrder ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          Placing Order...
+                        </>
+                      ) : (
+                        <>
+                          📦 Place Order
+                          {cart.products && cart.products.length > 0 && (
+                            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
+                              ${cart.total.toFixed(2)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                    {cart.products && cart.products.length === 0 && (
+                      <p className="text-[10px] text-gray-400 text-center mt-1">
+                        Cart is empty. Add products first.
+                      </p>
+                    )}
                   </div>
 
                   {/* Products List (expandable) */}
@@ -830,9 +975,32 @@ const Carts = () => {
                   ))}
                 </ul>
 
+                {/* ---------- NEW: Place Order button in detail modal ---------- */}
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    handlePlaceOrder(selectedCart.id);
+                  }}
+                  disabled={placingOrder[selectedCart.id] || !selectedCart.products || selectedCart.products.length === 0}
+                  className={`mt-4 w-full py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${
+                    placingOrder[selectedCart.id] || !selectedCart.products || selectedCart.products.length === 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
+                  }`}
+                >
+                  {placingOrder[selectedCart.id] ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      Placing Order...
+                    </>
+                  ) : (
+                    "📦 Place Order"
+                  )}
+                </button>
+
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg transition"
+                  className="mt-2 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg transition"
                 >
                   Close
                 </button>

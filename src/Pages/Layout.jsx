@@ -217,7 +217,7 @@ function Layout() {
             <div className="flex items-center gap-2 sm:gap-3 max-w-full">
               <span className="text-sm sm:text-base shrink-0">👋</span>
               <p className="text-xs sm:text-sm font-medium text-white truncate">
-                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
+              Ecommerce Website for Admin Dashboard Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userFullName}</span>
               </p>
             </div>
           </div>
